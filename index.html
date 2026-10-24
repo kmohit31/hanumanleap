@@ -372,7 +372,7 @@ function taper(c, p0, p1, p2, w0, w2, fill, bulge = .18, lw = 2.4) {
 function band(c, x, y, a, len, col = GOLD) { // armlet / anklet across a limb
   c.save(); c.translate(x, y); c.rotate(a); rr(c, -1.8, -len / 2, 3.6, len, 1.5); c.fillStyle = col; c.fill(); c.lineWidth = 1.4; c.strokeStyle = INK; c.stroke(); c.restore();
 }
-const HSK = '#ef7d2d', HSK_D = '#c9531b', HSK_L = '#ffb064', HFACE = '#f7cd97', HFACE_D = '#dda46c';
+const HSK = '#d69a66', HSK_D = '#b07446', HSK_L = '#f2c393', HFACE = '#efc497', HFACE_D = '#c98e60', DHOTI = '#5e3d8c', DHOTI_D = '#3c2560';
 function drawHanuman(c, x, y, s, ang, t, o = {}) {
   c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); c.rotate(ang); c.scale(s * 1.12, s * 1.12); c.lineCap = 'round'; c.lineJoin = 'round';
   if (o.glow) {
@@ -383,7 +383,7 @@ function drawHanuman(c, x, y, s, ang, t, o = {}) {
   // tail: a long elegant curve ending in a curl
   taper(c, [-15, 3], [-46, 22], [-72, 6 + sw * 2], 9, 6.5, HSK_D, .05);
   taper(c, [-72, 6 + sw * 2], [-90, -6 + sw * 3], [-78, -22 + sw * 4], 6.5, 4.5, HSK_D, .05);
-  c.beginPath(); c.moveTo(-81, -24 + sw * 4); c.quadraticCurveTo(-74, -33 + sw * 4, -68, -25 + sw * 4); c.quadraticCurveTo(-71, -19 + sw * 4, -77, -19 + sw * 4); c.closePath(); c.fillStyle = HSK; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(-81, -24 + sw * 4); c.quadraticCurveTo(-74, -33 + sw * 4, -68, -25 + sw * 4); c.quadraticCurveTo(-71, -19 + sw * 4, -77, -19 + sw * 4); c.closePath(); c.fillStyle = '#6a4028'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
   // far scarf ribbon
   c.beginPath(); c.moveTo(6, -15); c.bezierCurveTo(-14, -26 + sw2 * 3, -30, -12 + sw2 * 5, -52, -24 + sw2 * 7); c.lineTo(-48, -17 + sw2 * 6); c.bezierCurveTo(-30, -6 + sw2 * 4, -14, -18 + sw2 * 2, 4, -9); c.closePath();
   c.fillStyle = '#a3142c'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
@@ -418,26 +418,31 @@ function drawHanuman(c, x, y, s, ang, t, o = {}) {
   c.fillStyle = tg; c.fill(); c.lineWidth = 2.8; c.strokeStyle = INK; c.stroke();
   c.lineWidth = 1.6; c.strokeStyle = 'rgba(122,40,10,.6)';
   c.beginPath(); c.moveTo(14, -1); c.quadraticCurveTo(21, 6, 27, 1); c.stroke();
-  c.beginPath(); c.moveTo(4, 6); c.quadraticCurveTo(7, 10, 10, 8); c.moveTo(-3, 7); c.quadraticCurveTo(0, 11, 3, 9); c.stroke();
+  c.beginPath(); c.moveTo(4, 6); c.quadraticCurveTo(7, 10, 10, 8); c.moveTo(-3, 7); c.quadraticCurveTo(0, 11, 3, 9); c.moveTo(11, 3); c.quadraticCurveTo(14, 7, 17, 5); c.moveTo(6, -2); c.quadraticCurveTo(10, 3, 13, 0); c.stroke();
   c.beginPath(); c.moveTo(-12, -9); c.quadraticCurveTo(4, -16, 22, -14); c.lineWidth = 2; c.strokeStyle = 'rgba(255,214,150,.75)'; c.stroke();
   c.beginPath(); c.moveTo(8, -16); c.quadraticCurveTo(2, -2, -6, 11); c.lineWidth = 1.4; c.strokeStyle = '#fff1c8'; c.stroke();
-  // dhoti with gold border, and a red waist sash
+  // purple dhoti with gold borders, and a jewelled gold belt
   c.beginPath(); c.moveTo(-5, -1); c.quadraticCurveTo(-14, -7, -24, -2); c.quadraticCurveTo(-29, 8, -21, 16); c.quadraticCurveTo(-10, 19, -2, 12); c.closePath();
-  const dg = c.createLinearGradient(0, -6, 0, 18); dg.addColorStop(0, '#ffd34d'); dg.addColorStop(1, '#f29a12'); c.fillStyle = dg; c.fill(); c.lineWidth = 2.6; c.strokeStyle = INK; c.stroke();
-  c.beginPath(); c.moveTo(-22, 14); c.quadraticCurveTo(-11, 18, -3, 11.5); c.lineWidth = 2.4; c.strokeStyle = '#c8202a'; c.stroke();
-  c.lineWidth = 1.2; c.strokeStyle = 'rgba(150,80,0,.7)'; c.beginPath(); c.moveTo(-18, 0); c.quadraticCurveTo(-16, 8, -19, 13); c.moveTo(-12, -2); c.quadraticCurveTo(-10, 6, -12, 14); c.stroke();
-  c.beginPath(); c.moveTo(-4, -4); c.quadraticCurveTo(-1, 4, -4, 13); c.lineWidth = 4.5; c.strokeStyle = '#d0202e'; c.stroke(); c.lineWidth = 1.2; c.strokeStyle = INK; c.stroke();
+  const dg = c.createLinearGradient(0, -6, 0, 18); dg.addColorStop(0, '#7a56b0'); dg.addColorStop(1, DHOTI_D); c.fillStyle = dg; c.fill(); c.lineWidth = 2.6; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(-22, 14); c.quadraticCurveTo(-11, 18, -3, 11.5); c.lineWidth = 3; c.strokeStyle = GOLD; c.stroke();
+  c.lineWidth = 1.2; c.strokeStyle = 'rgba(20,5,40,.55)'; c.beginPath(); c.moveTo(-18, 0); c.quadraticCurveTo(-16, 8, -19, 13); c.moveTo(-12, -2); c.quadraticCurveTo(-10, 6, -12, 14); c.stroke();
+  c.beginPath(); c.moveTo(-4, -4); c.quadraticCurveTo(-1, 4, -4, 13); c.lineWidth = 5.5; c.strokeStyle = INK; c.stroke(); c.lineWidth = 3.5; c.strokeStyle = GOLD; c.stroke();
+  blob(c, -2.6, 4, 2.4, '#d62828', 1.2); blob(c, -3.6, -1, 1.4, '#2fbf6f', .8); blob(c, -3.4, 9, 1.4, '#2fbf6f', .8);
   // near leg, knee bent
   taper(c, [-11, 11], [-17, 22], [-25, 26], 13.5, 10, HSK, .22);
   taper(c, [-25, 26], [-37, 30], [-49, 25], 10, 6.5, HSK, .28);
   band(c, -46, 26, -.5, 8.5);
   c.beginPath(); c.ellipse(-52, 24, 5.5, 3.2, -.35, 0, TAU); c.fillStyle = HSK; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
   // necklace
-  c.beginPath(); c.arc(24, -10, 8.5, .55, 2.25); c.lineWidth = 2.6; c.strokeStyle = GOLD; c.stroke();
+  c.beginPath(); c.arc(24, -10, 9.5, .45, 2.35); c.lineWidth = 5.5; c.strokeStyle = INK; c.stroke(); c.lineWidth = 3.8; c.strokeStyle = GOLD; c.stroke();
+  c.beginPath(); c.arc(24, -10, 6.5, .6, 2.2); c.lineWidth = 2; c.strokeStyle = '#c98a12'; c.stroke();
   blob(c, 21, -2, 2.2, '#d62828', 1.2);
   // head (drawn a little larger than life, as in devotional art)
   const hx = 37, hy = -22;
   c.save(); c.translate(hx, hy + 4); c.scale(1.2, 1.2); c.translate(-hx, -hy - 4);
+  c.beginPath(); c.arc(hx - 1, hy - 3, 19, 0, TAU); c.lineWidth = 3; c.strokeStyle = GOLD; c.stroke();
+  c.lineWidth = 1.6; for (let i = 0; i < 18; i++) { const a = i / 18 * TAU; c.beginPath(); c.moveTo(hx - 1 + Math.cos(a) * 19, hy - 3 + Math.sin(a) * 19); c.lineTo(hx - 1 + Math.cos(a) * 23, hy - 3 + Math.sin(a) * 23); c.stroke(); }
+  c.beginPath(); c.moveTo(34, -32); c.quadraticCurveTo(18, -34, 10, -20 + sw2 * 2); c.quadraticCurveTo(18, -16, 28, -12); c.closePath(); c.fillStyle = '#24160e'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
   c.beginPath(); c.arc(hx, hy, 12.5, 0, TAU); c.fillStyle = HSK; c.fill(); c.lineWidth = 2.8; c.strokeStyle = INK; c.stroke();
   // face mask and the strong, rounded jaw
   c.beginPath(); c.moveTo(33, -31); c.quadraticCurveTo(43, -35, 48, -27); c.quadraticCurveTo(51.5, -22, 51.5, -17); c.quadraticCurveTo(53, -9.5, 47, -8);
@@ -446,6 +451,7 @@ function drawHanuman(c, x, y, s, ang, t, o = {}) {
   c.beginPath(); c.arc(41.5, -11, 6, .2, 2.6); c.lineWidth = 1.5; c.strokeStyle = 'rgba(160,90,40,.8)'; c.stroke();
   c.beginPath(); c.ellipse(50.2, -18.5, 2.2, 1.6, .3, 0, TAU); c.fillStyle = INK; c.fill();
   c.beginPath(); c.moveTo(49, -12.5); c.quadraticCurveTo(46, -10, 43, -11.5); c.lineWidth = 1.7; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(36, -8.5); c.quadraticCurveTo(41, -2, 47, -7.5); c.quadraticCurveTo(43, -6.5, 36, -8.5); c.closePath(); c.fillStyle = '#f4f0e6'; c.fill(); c.lineWidth = 1.4; c.strokeStyle = INK; c.stroke();
   c.beginPath(); c.ellipse(42, -24, 3.6, 2.7, -.15, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 1.3; c.stroke();
   c.beginPath(); c.arc(43, -24, 1.9, 0, TAU); c.fillStyle = '#3a1a08'; c.fill();
   c.beginPath(); c.arc(43.6, -24.6, .6, 0, TAU); c.fillStyle = '#fff'; c.fill();
@@ -459,8 +465,8 @@ function drawHanuman(c, x, y, s, ang, t, o = {}) {
   c.beginPath(); c.moveTo(28, -31); c.lineTo(29.5, -38); c.lineTo(33, -36); c.lineTo(35, -46); c.lineTo(38, -42); c.lineTo(40, -56); c.lineTo(42, -42); c.lineTo(45, -46); c.lineTo(46.5, -36); c.lineTo(49.5, -38); c.lineTo(48.5, -31); c.closePath();
   c.fillStyle = cg; c.fill(); c.lineWidth = 2.2; c.strokeStyle = INK; c.stroke();
   rr(c, 27.5, -34, 22, 4.5, 1.5); c.fillStyle = '#e9a520'; c.fill(); c.lineWidth = 1.8; c.stroke();
-  for (const gx of [31, 38.5, 46]) blob(c, gx, -31.8, 1.5, gx === 38.5 ? '#d62828' : '#3fbf8f', .8);
-  blob(c, 40, -45, 2.2, '#d62828', 1); blob(c, 40, -57.5, 1.8, GOLD, 1);
+  for (const gx of [31, 38.5, 46]) blob(c, gx, -31.8, 1.5, gx === 38.5 ? '#2fbf6f' : '#d62828', .8);
+  blob(c, 40, -45, 2.6, '#2fbf6f', 1); blob(c, 40, -57.5, 1.8, GOLD, 1);
   c.beginPath(); c.moveTo(28, -33); c.quadraticCurveTo(22, -36, 23, -42); c.lineWidth = 2.4; c.strokeStyle = GOLD; c.stroke();
   c.restore();
   // near scarf end over the shoulder
@@ -477,6 +483,105 @@ function drawHanuman(c, x, y, s, ang, t, o = {}) {
     c.fillStyle = rg; c.beginPath(); c.arc(62, -10, 22, 0, TAU); c.fill();
     c.beginPath(); c.arc(63, -11, 4.5, 0, TAU); c.lineWidth = 2.6; c.strokeStyle = GOLD; c.stroke(); blob(c, 63, -16, 1.8, '#d62828', 1);
   }
+  c.restore();
+}
+function drawHanumanStand(c, x, fy, s, t, o = {}) { // standing, gada over the shoulder, as in devotional art
+  c.save(); c.translate(x, fy); c.scale(s, s); c.lineCap = 'round'; c.lineJoin = 'round';
+  const sw = Math.sin(t * 2.2), sw2 = Math.sin(t * 2.8 + 1), hx = 0, hy = -116;
+  // tail rising behind on the right, ending in a dark tuft
+  taper(c, [8, -50], [46, -40], [40, -82 + sw * 2], 8, 5, HSK_D, .05);
+  c.beginPath(); c.ellipse(39, -88 + sw * 2, 4.5, 8, .2, 0, TAU); c.fillStyle = '#6a4028'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  // red sash looping behind the back
+  c.beginPath(); c.moveTo(-31, -76); c.quadraticCurveTo(0, -46, 30, -74); c.lineWidth = 12; c.strokeStyle = INK; c.stroke(); c.lineWidth = 8.5; c.strokeStyle = '#c81e32'; c.stroke();
+  // halo behind the head
+  c.beginPath(); c.arc(hx, hy - 3, 25, 0, TAU); c.lineWidth = 3.5; c.strokeStyle = GOLD; c.stroke();
+  c.lineWidth = 2; for (let i = 0; i < 20; i++) { const a = i / 20 * TAU; c.beginPath(); c.moveTo(hx + Math.cos(a) * 25, hy - 3 + Math.sin(a) * 25); c.lineTo(hx + Math.cos(a) * 30, hy - 3 + Math.sin(a) * 30); c.stroke(); }
+  c.beginPath(); c.arc(hx, hy - 3, 21.5, 0, TAU); c.lineWidth = 1.2; c.strokeStyle = 'rgba(255,200,61,.6)'; c.stroke();
+  // golden gada resting on the shoulder, its head behind the crown
+  c.save(); c.translate(-21, -100); c.rotate(-.72);
+  rr(c, -4, -3.2, 52, 6.4, 3); const sg = c.createLinearGradient(0, -3, 0, 3); sg.addColorStop(0, '#ffe08a'); sg.addColorStop(1, GOLD2); c.fillStyle = sg; c.fill(); c.lineWidth = 2.2; c.strokeStyle = INK; c.stroke();
+  for (const bx of [8, 34]) band(c, bx, 0, 0, 8, '#e9a520');
+  blob(c, -6, 0, 4, GOLD, 2);
+  const hg = c.createRadialGradient(58, -6, 2, 60, 0, 17); hg.addColorStop(0, '#fff6c4'); hg.addColorStop(.45, GOLD); hg.addColorStop(1, '#b8740c');
+  c.beginPath(); c.ellipse(61, 0, 14, 13, 0, 0, TAU); c.fillStyle = hg; c.fill(); c.lineWidth = 2.8; c.strokeStyle = INK; c.stroke();
+  c.lineWidth = 1.5; c.strokeStyle = 'rgba(120,70,0,.85)'; c.beginPath(); c.ellipse(61, 0, 14, 4, 0, 0, TAU); c.stroke(); c.beginPath(); c.ellipse(61, 0, 5, 13, 0, 0, TAU); c.stroke();
+  c.beginPath(); c.moveTo(75, 0); c.lineTo(82, -3); c.lineTo(84, 0); c.lineTo(82, 3); c.closePath(); c.fillStyle = GOLD; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  c.restore();
+  // long dark hair falling to the shoulders
+  c.beginPath(); c.moveTo(hx - 14, hy - 6); c.quadraticCurveTo(hx - 21, hy + 14, hx - 15, hy + 27); c.lineTo(hx + 15, hy + 27); c.quadraticCurveTo(hx + 21, hy + 14, hx + 14, hy - 6); c.closePath();
+  c.fillStyle = '#24160e'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  // legs, feet and anklets
+  taper(c, [-9, -54], [-12, -40], [-12, -26], 16, 11, HSK_D, .22); taper(c, [-12, -26], [-14, -14], [-13, -4], 11, 7.5, HSK_D, .3);
+  taper(c, [9, -54], [13, -40], [14, -26], 16, 11, HSK, .22); taper(c, [14, -26], [16, -14], [17, -4], 11, 7.5, HSK, .3);
+  for (const [fx, col] of [[-14, HSK_D], [19, HSK]]) { c.beginPath(); c.ellipse(fx, -2.5, 7.5, 3.4, 0, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke(); }
+  band(c, -13, -6, Math.PI / 2, 9); band(c, 17, -6, Math.PI / 2, 9);
+  // purple dhoti with gold borders and a hanging front panel
+  c.beginPath(); c.moveTo(-18, -62); c.lineTo(18, -62); c.quadraticCurveTo(21, -50, 20, -38); c.quadraticCurveTo(11, -35, 4, -42); c.lineTo(-4, -42); c.quadraticCurveTo(-11, -35, -20, -38); c.quadraticCurveTo(-21, -50, -18, -62); c.closePath();
+  const dg = c.createLinearGradient(-20, 0, 20, 0); dg.addColorStop(0, DHOTI_D); dg.addColorStop(.5, '#7a56b0'); dg.addColorStop(1, DHOTI); c.fillStyle = dg; c.fill(); c.lineWidth = 2.6; c.strokeStyle = INK; c.stroke();
+  c.lineWidth = 2.6; c.strokeStyle = GOLD; c.beginPath(); c.moveTo(-19.5, -39); c.quadraticCurveTo(-11, -36.5, -5, -42); c.moveTo(19.5, -39); c.quadraticCurveTo(11, -36.5, 5, -42); c.stroke();
+  c.lineWidth = 1.2; c.strokeStyle = 'rgba(20,5,40,.5)'; c.beginPath(); c.moveTo(-12, -58); c.quadraticCurveTo(-14, -48, -12, -40); c.moveTo(12, -58); c.quadraticCurveTo(14, -48, 12, -40); c.stroke();
+  c.beginPath(); c.moveTo(-5, -57); c.lineTo(5, -57); c.lineTo(6.5, -22 + sw2); c.lineTo(-6.5, -22 + sw2); c.closePath(); c.fillStyle = DHOTI; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  c.lineWidth = 2.2; c.strokeStyle = GOLD; c.beginPath(); c.moveTo(-6, -30 + sw2); c.lineTo(6, -30 + sw2); c.moveTo(-6.4, -25 + sw2); c.lineTo(6.4, -25 + sw2); c.stroke();
+  // jewelled belt
+  rr(c, -19.5, -64, 39, 6.5, 2.5); c.fillStyle = GOLD; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(0, -67); c.lineTo(5, -60.5); c.lineTo(0, -54); c.lineTo(-5, -60.5); c.closePath(); c.fillStyle = '#e9a520'; c.fill(); c.stroke();
+  blob(c, 0, -60.5, 2.3, '#d62828', 1); for (const gx of [-12, 12]) blob(c, gx, -60.7, 1.6, '#2fbf6f', .8);
+  // muscular torso
+  c.beginPath(); c.moveTo(-13, -62); c.quadraticCurveTo(-17, -78, -24, -93); c.quadraticCurveTo(-14, -101, 0, -100); c.quadraticCurveTo(14, -101, 24, -93); c.quadraticCurveTo(17, -78, 13, -62); c.closePath();
+  const tg = c.createLinearGradient(-24, -100, 24, -62); tg.addColorStop(0, HSK_L); tg.addColorStop(.55, HSK); tg.addColorStop(1, HSK_D);
+  c.fillStyle = tg; c.fill(); c.lineWidth = 2.6; c.strokeStyle = INK; c.stroke();
+  c.lineWidth = 1.5; c.strokeStyle = 'rgba(110,55,20,.7)';
+  c.beginPath(); c.moveTo(-19, -89); c.quadraticCurveTo(-10, -79, -1, -86); c.moveTo(19, -89); c.quadraticCurveTo(10, -79, 1, -86); c.moveTo(0, -86); c.lineTo(0, -64); c.stroke();
+  for (const y of [-77, -71, -65.5]) for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * 7.5, y); c.quadraticCurveTo(sx * 3.5, y + 2.2, sx * .5, y); c.stroke(); }
+  c.beginPath(); c.moveTo(-12.5, -76); c.quadraticCurveTo(-10, -69, -11, -63); c.moveTo(12.5, -76); c.quadraticCurveTo(10, -69, 11, -63); c.stroke();
+  c.beginPath(); c.moveTo(-15, -97); c.quadraticCurveTo(-2, -80, 12, -62); c.lineWidth = 1.4; c.strokeStyle = '#fff1c8'; c.stroke();
+  // neck and broad gold collar
+  rr(c, -5, -107, 10, 9, 3); c.fillStyle = HSK; c.fill();
+  c.beginPath(); c.arc(0, -101, 12.5, .2, Math.PI - .2); c.lineWidth = 6; c.strokeStyle = INK; c.stroke(); c.lineWidth = 4.5; c.strokeStyle = GOLD; c.stroke();
+  c.beginPath(); c.arc(0, -101, 8.5, .35, Math.PI - .35); c.lineWidth = 2.4; c.strokeStyle = '#c98a12'; c.stroke();
+  blob(c, 0, -88.5, 2.4, '#d62828', 1); blob(c, -6, -90, 1.4, '#2fbf6f', .8); blob(c, 6, -90, 1.4, '#2fbf6f', .8);
+  // arm raised to hold the gada
+  taper(c, [-23, -92], [-30, -84], [-31, -74], 12.5, 9.5, HSK_D, .25); taper(c, [-31, -74], [-33, -88], [-22, -98], 9.5, 8, HSK_D, .2);
+  band(c, -27, -85, -1.1, 10); band(c, -24.5, -94.5, .7, 9);
+  blob(c, -21, -100, 5.5, HSK, 2.2);
+  // other arm: resting with the sash, or offering Rama's ring
+  if (o.offer) {
+    taper(c, [23, -92], [30, -86], [33, -81], 12.5, 9.5, HSK, .25); taper(c, [33, -81], [43, -83], [53, -88], 9.5, 7.5, HSK, .2);
+    band(c, 28, -87, .9, 10); band(c, 50, -87.5, 1.8, 8);
+    blob(c, 56, -89, 5, HSK, 2.2);
+    const rg = c.createRadialGradient(61, -94, 1, 61, -94, 24); rg.addColorStop(0, 'rgba(255,240,170,.95)'); rg.addColorStop(1, 'rgba(255,200,61,0)'); c.fillStyle = rg; c.beginPath(); c.arc(61, -94, 24, 0, TAU); c.fill();
+    c.beginPath(); c.arc(61, -94, 4.5, 0, TAU); c.lineWidth = 2.6; c.strokeStyle = GOLD; c.stroke(); blob(c, 61, -99, 1.8, '#d62828', 1);
+  } else {
+    taper(c, [23, -92], [29, -84], [29, -75], 12.5, 9.5, HSK, .25); taper(c, [29, -75], [31, -66], [29, -56], 9.5, 7.5, HSK, .2);
+    band(c, 26, -84, -.2, 10); band(c, 30, -60, 1.5, 8);
+    blob(c, 29, -53.5, 4.6, HSK, 2.2);
+  }
+  // sash ends flowing beside the legs
+  c.beginPath(); c.moveTo(-30, -74); c.bezierCurveTo(-40, -60, -34 + sw * 3, -46, -40 + sw * 4, -28); c.lineTo(-33 + sw * 4, -30); c.bezierCurveTo(-28 + sw * 3, -48, -32, -60, -26, -72); c.closePath(); c.fillStyle = '#e02443'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  if (!o.offer) { c.beginPath(); c.moveTo(29, -56); c.bezierCurveTo(34, -46, 30 + sw2 * 3, -36, 36 + sw2 * 4, -22); c.lineTo(30 + sw2 * 4, -22); c.bezierCurveTo(25 + sw2 * 3, -36, 26, -46, 26, -55); c.closePath(); c.fillStyle = '#e02443'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke(); }
+  // head
+  for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(hx + sx * 13, hy + 1, 3.6, 5, 0, 0, TAU); c.fillStyle = HFACE_D; c.fill(); c.lineWidth = 1.8; c.strokeStyle = INK; c.stroke(); c.beginPath(); c.arc(hx + sx * 13.5, hy + 8, 2.6, 0, TAU); c.lineWidth = 1.8; c.strokeStyle = GOLD; c.stroke(); }
+  const fg = c.createLinearGradient(0, hy - 13, 0, hy + 13); fg.addColorStop(0, HSK_L); fg.addColorStop(1, HSK);
+  c.beginPath(); c.arc(hx, hy, 13, 0, TAU); c.fillStyle = fg; c.fill(); c.lineWidth = 2.6; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.ellipse(hx, hy + 6, 8.5, 6.5, 0, 0, TAU); c.fillStyle = '#f2cfa6'; c.fill(); c.lineWidth = 1.6; c.stroke();
+  c.beginPath(); c.ellipse(hx, hy + 3, 2.2, 1.4, 0, 0, TAU); c.fillStyle = INK; c.fill();
+  c.beginPath(); c.moveTo(hx - 4, hy + 8); c.quadraticCurveTo(hx, hy + 10, hx + 4, hy + 8); c.lineWidth = 1.5; c.stroke();
+  c.beginPath(); c.moveTo(hx - 7, hy + 11); c.quadraticCurveTo(hx, hy + 21, hx + 7, hy + 11); c.quadraticCurveTo(hx, hy + 14, hx - 7, hy + 11); c.closePath(); c.fillStyle = '#f4f0e6'; c.fill(); c.lineWidth = 1.4; c.stroke();
+  for (const sx of [-1, 1]) {
+    c.beginPath(); c.ellipse(hx + sx * 5, hy - 2, 3.2, 2.3, 0, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = INK; c.stroke();
+    c.beginPath(); c.arc(hx + sx * 5, hy - 2, 1.6, 0, TAU); c.fillStyle = '#3a1a08'; c.fill();
+    c.beginPath(); c.moveTo(hx + sx * 1.5, hy - 6); c.quadraticCurveTo(hx + sx * 5, hy - 8.5, hx + sx * 9, hy - 6); c.lineWidth = 2.2; c.strokeStyle = INK; c.stroke();
+  }
+  c.beginPath(); c.moveTo(hx - 2.2, hy - 12.5); c.quadraticCurveTo(hx, hy - 6, hx + 2.2, hy - 12.5); c.lineWidth = 1.4; c.strokeStyle = '#fff1c8'; c.stroke();
+  c.beginPath(); c.moveTo(hx, hy - 12.5); c.lineTo(hx, hy - 7.5); c.lineWidth = 1.8; c.strokeStyle = '#d62828'; c.stroke();
+  // mukut with a green centre gem
+  const cg = c.createLinearGradient(0, hy - 38, 0, hy - 11); cg.addColorStop(0, '#fff3b0'); cg.addColorStop(.5, GOLD); cg.addColorStop(1, '#d08a10');
+  c.beginPath(); c.moveTo(hx - 13.5, hy - 11); c.lineTo(hx - 12, hy - 20); c.lineTo(hx - 7, hy - 18); c.lineTo(hx - 5, hy - 27); c.lineTo(hx - 2, hy - 24); c.lineTo(hx, hy - 38); c.lineTo(hx + 2, hy - 24); c.lineTo(hx + 5, hy - 27); c.lineTo(hx + 7, hy - 18); c.lineTo(hx + 12, hy - 20); c.lineTo(hx + 13.5, hy - 11); c.closePath();
+  c.fillStyle = cg; c.fill(); c.lineWidth = 2.2; c.strokeStyle = INK; c.stroke();
+  rr(c, -14, hy - 14.5, 28, 4.5, 1.5); c.fillStyle = '#e9a520'; c.fill(); c.lineWidth = 1.6; c.stroke();
+  c.beginPath(); c.ellipse(hx, hy - 20, 3, 3.8, 0, 0, TAU); c.fillStyle = '#2fbf6f'; c.fill(); c.lineWidth = 1.4; c.stroke();
+  for (const sx of [-1, 1]) blob(c, hx + sx * 8, hy - 12.3, 1.3, '#d62828', .7);
+  blob(c, hx, hy - 39.5, 1.8, GOLD, 1);
   c.restore();
 }
 function drawLotus(c, x, y, s = 1) {
@@ -1015,7 +1120,7 @@ class FlightLevel extends Level {
       else if (o.type === 'orb') drawOrb(c, x, o.y + Math.sin(t * 2 + o.ph) * 6, t);
       else if (o.type === 'bird') drawBird(c, x, o.y, o.f);
     }
-    if (!(p.inv > 0 && p.inv < 50 && Math.sin(t * 30) > .3) || this.state !== 'fly') drawHanuman(c, p.sx, p.y, p.size, p.ang, t, { glow: p.glow > 0 });
+    if (!(p.inv > 0 && p.inv < 50 && Math.sin(t * 30) > .3) || this.state !== 'fly') this.drawHero(c);
     for (const o of this.objs) { if (!o.dead && o.x > L - 600 && o.x < R) this.objDraw(c, o, o.x - camX, 'front'); }
     this.drawFront(c, camX);
     this.drawFx(c, camX);
@@ -1035,6 +1140,7 @@ class FlightLevel extends Level {
     text(c, Game.touch ? 'Hold FLY to begin' : 'Hold SPACE or click to begin', cxT, 290, { size: 26, align: 'center' });
     c.globalAlpha = 1;
   }
+  drawHero(c) { const p = this.p; drawHanuman(c, p.sx, p.y, p.size, p.ang, this.t, { glow: p.glow > 0 }); }
   drawShadow(c) {
     const p = this.p, shA = clamp(1 - (SURF - p.y) / 380, .1, .5);
     c.beginPath(); c.ellipse(this.shadowX() - this.camX, SURF + 8, 30 * p.size, 6 * p.size, 0, 0, TAU); c.fillStyle = `rgba(5,15,40,${shA})`; c.fill();
@@ -1139,6 +1245,7 @@ class LeapLevel extends FlightLevel {
   leapVy() { return this.cp ? -200 : -430; }
   drawMid(c, camX) { if (camX < 900) drawShoreFoam(c, -440 - camX, 520 - camX, this.t, camX); }
   drawShadow(c, camX) { if (this.state !== 'ready' || this.cp) super.drawShadow(c, camX); }
+  drawHero(c) { if (this.state === 'ready' && !this.cp) drawHanumanStand(c, this.p.sx, 318, 1.25, this.t); else super.drawHero(c); }
   onLeap() { this.showHint('fly', 'Release to glide · ← → to slow down or speed up', 'Release FLY to glide · ◀ ▶ to slow down or speed up'); }
   drawBack(c, camX) {
     if (camX < 900) drawMahendra(c, -camX, this.t);
@@ -1682,6 +1789,7 @@ class GroundLevel extends FlightLevel {
   drawScene(c, camX) {}
   shadowY() { return this.p.landed ? this.p.landed.top + 3 : this.floorY + 3; }
   heroOpts() { return { glow: this.p.glow > 0, flip: this.p.face < 0 }; }
+  drawHero(c) { const p = this.p; drawHanuman(c, p.sx, p.y, p.size, p.ang, this.t, this.heroOpts()); }
   draw(c) {
     const p = this.p, t = this.t, W = View.w, camX = this.camX, sh = this.shake > 0 ? this.shake * 14 : 0;
     c.save(); if (sh) c.translate((Math.random() - .5) * sh, (Math.random() - .5) * sh);
@@ -1697,7 +1805,7 @@ class GroundLevel extends FlightLevel {
       if (o.type === 'lotus') drawLotus(c, o.x - camX, o.y + Math.sin(t * 2 + o.ph) * 5);
       else if (o.type === 'orb') drawOrb(c, o.x - camX, o.y + Math.sin(t * 2 + o.ph) * 6, t);
     }
-    if (!(p.inv > 0 && p.inv < 50 && Math.sin(t * 30) > .3) || this.state !== 'fly') drawHanuman(c, p.sx, p.y, p.size, p.ang, t, this.heroOpts());
+    if (!(p.inv > 0 && p.inv < 50 && Math.sin(t * 30) > .3) || this.state !== 'fly') this.drawHero(c);
     for (const o of this.objs) if (vis(o)) this.objDraw(c, o, o.x - camX, 'front');
     this.drawFront(c, camX);
     this.drawFx(c, camX);
@@ -2137,7 +2245,8 @@ class VatikaLevel extends GroundLevel {
   onReset() { this.ph = 'enter'; this.sleep = 0; this.aware = 0; this.seen = 0; this.meetT = 0; this.spawnT = 1; this.inTree = false; this.said = {}; }
   onLeap() { this.showHint('tree', 'Shrink and hide in the shimshapa tree', 'SHRINK and hide in the shimshapa tree'); }
   xRange() { return [50, this.sitaX() - 70]; }
-  heroOpts() { return { glow: this.p.glow > 0, flip: this.ph !== 'meet' && this.p.face < 0, ring: this.ph === 'meet' && this.meetT > 1.2 }; }
+  heroOpts() { return { glow: this.p.glow > 0, flip: this.p.face < 0 }; }
+  drawHero(c) { if (this.ph === 'meet') drawHanumanStand(c, this.p.sx, this.floorY, 1.2, this.t, { offer: this.meetT > 1.2 }); else super.drawHero(c); }
   progress() { return this.ph === 'meet' ? 1 : this.ph === 'asleep' ? .8 : this.sleep * .7; }
   cpFrac() { return null; }
   finished() { return this.ph === 'meet' && this.meetT > 19; }
@@ -2161,7 +2270,7 @@ class VatikaLevel extends GroundLevel {
         break;
       case 'meet': {
         this.meetT += dt; p.idx = 1; p.cur = 1; p.size = lerp(p.size, 1, dt * 3);
-        p.sx = lerp(p.sx, S - 135, dt * 3); p.x = p.sx; p.y = lerp(p.y, this.floorY - 48, dt * 3); p.vy = 0; p.ang = lerp(p.ang, -.42, dt * 3); p.face = 1;
+        p.sx = lerp(p.sx, S - 150, dt * 3); p.x = p.sx; p.y = lerp(p.y, this.floorY - 48, dt * 3); p.vy = 0; p.ang = lerp(p.ang, -.42, dt * 3); p.face = 1;
         const at = (k, tt, f) => { if (this.meetT >= tt && !this.said[k]) { this.said[k] = 1; f(); } };
         at('h1', .3, () => this.speak('Hanuman', 'Mother, I am Hanuman, messenger of Shri Rama. He sends you his ring as a sign.', 5));
         at('ring', 1.2, () => { Sound.chime(true); this.burst(p.x + 55, p.y - 10, 16, GOLD, 120); });
