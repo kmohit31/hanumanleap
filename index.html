@@ -355,57 +355,127 @@ function limb(c, p, w, col) {
   c.lineWidth = w + 5; c.strokeStyle = INK; c.stroke(); c.lineWidth = w; c.strokeStyle = col; c.stroke();
 }
 function blob(c, x, y, r, fill, lw = 2.5) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fillStyle = fill; c.fill(); c.lineWidth = lw; c.strokeStyle = INK; c.stroke(); }
-function drawHanuman(c, x, y, s, ang, t, o = {}) {
-  c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); c.rotate(ang); c.scale(s, s); c.lineCap = 'round'; c.lineJoin = 'round';
-  if (o.glow) {
-    const g = c.createRadialGradient(0, -6, 10, 0, -6, 80); g.addColorStop(0, 'rgba(255,240,160,.85)'); g.addColorStop(.5, 'rgba(255,200,61,.4)'); g.addColorStop(1, 'rgba(255,170,40,0)');
-    c.fillStyle = g; c.beginPath(); c.arc(0, -6, 80, 0, TAU); c.fill();
+// tapered, slightly muscular limb segment along a quadratic curve
+function taper(c, p0, p1, p2, w0, w2, fill, bulge = .18, lw = 2.4) {
+  const A = [], B = [], N = 12;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, mt = 1 - t;
+    const x = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0], y = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1];
+    const dx = 2 * mt * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]), dy = 2 * mt * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1]);
+    const l = Math.hypot(dx, dy) || 1, w = (w0 + (w2 - w0) * t) / 2 * (1 + bulge * Math.sin(t * Math.PI));
+    A.push([x - dy / l * w, y + dx / l * w]); B.push([x + dy / l * w, y - dx / l * w]);
   }
-  const sw = Math.sin(t * 5) * 3;
-  // tail, curling up behind
-  c.beginPath(); c.moveTo(-18, 2); c.bezierCurveTo(-46, 4, -62, -18, -54, -38 + sw); c.bezierCurveTo(-48, -52 + sw, -31, -51 + sw, -33, -38 + sw);
-  c.lineWidth = 11; c.strokeStyle = INK; c.stroke(); c.lineWidth = 6; c.strokeStyle = FUR; c.stroke();
-  blob(c, -33, -37 + sw, 4.5, FUR2);
-  // trailing leg
-  limb(c, [[-14, 6], [-34, 13], [-52, 9]], 8, FUR2);
-  // gada (golden mace) held back over the shoulder
-  c.save(); c.translate(-2, -20); c.rotate(-.35);
-  rr(c, -30, -3, 36, 6, 3); c.fillStyle = GOLD2; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
-  const gg = c.createRadialGradient(-39, -4, 2, -36, 0, 13); gg.addColorStop(0, '#fff3b0'); gg.addColorStop(.5, GOLD); gg.addColorStop(1, '#d08a10');
-  c.beginPath(); c.ellipse(-37, 0, 12.5, 11.5, 0, 0, TAU); c.fillStyle = gg; c.fill(); c.lineWidth = 3; c.stroke();
-  c.lineWidth = 1.8; c.beginPath(); c.moveTo(-37, -11); c.quadraticCurveTo(-31, 0, -37, 11); c.moveTo(-43, -9); c.quadraticCurveTo(-47, 0, -43, 9); c.stroke();
-  blob(c, -51, 0, 3.2, GOLD, 2); blob(c, 7, 0, 3.5, GOLD, 2);
+  c.beginPath(); A.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y));
+  for (let i = B.length - 1; i >= 0; i--) c.lineTo(B[i][0], B[i][1]);
+  c.closePath(); c.fillStyle = fill; c.fill(); c.lineWidth = lw; c.strokeStyle = INK; c.stroke();
+}
+function band(c, x, y, a, len, col = GOLD) { // armlet / anklet across a limb
+  c.save(); c.translate(x, y); c.rotate(a); rr(c, -1.8, -len / 2, 3.6, len, 1.5); c.fillStyle = col; c.fill(); c.lineWidth = 1.4; c.strokeStyle = INK; c.stroke(); c.restore();
+}
+const HSK = '#ef7d2d', HSK_D = '#c9531b', HSK_L = '#ffb064', HFACE = '#f7cd97', HFACE_D = '#dda46c';
+function drawHanuman(c, x, y, s, ang, t, o = {}) {
+  c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); c.rotate(ang); c.scale(s * 1.12, s * 1.12); c.lineCap = 'round'; c.lineJoin = 'round';
+  if (o.glow) {
+    const g = c.createRadialGradient(0, -8, 10, 0, -8, 86); g.addColorStop(0, 'rgba(255,240,160,.9)'); g.addColorStop(.5, 'rgba(255,200,61,.42)'); g.addColorStop(1, 'rgba(255,170,40,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(0, -8, 86, 0, TAU); c.fill();
+  }
+  const sw = Math.sin(t * 4.5), sw2 = Math.sin(t * 6 + 1);
+  // tail: a long elegant curve ending in a curl
+  taper(c, [-15, 3], [-46, 22], [-72, 6 + sw * 2], 9, 6.5, HSK_D, .05);
+  taper(c, [-72, 6 + sw * 2], [-90, -6 + sw * 3], [-78, -22 + sw * 4], 6.5, 4.5, HSK_D, .05);
+  c.beginPath(); c.moveTo(-81, -24 + sw * 4); c.quadraticCurveTo(-74, -33 + sw * 4, -68, -25 + sw * 4); c.quadraticCurveTo(-71, -19 + sw * 4, -77, -19 + sw * 4); c.closePath(); c.fillStyle = HSK; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  // far scarf ribbon
+  c.beginPath(); c.moveTo(6, -15); c.bezierCurveTo(-14, -26 + sw2 * 3, -30, -12 + sw2 * 5, -52, -24 + sw2 * 7); c.lineTo(-48, -17 + sw2 * 6); c.bezierCurveTo(-30, -6 + sw2 * 4, -14, -18 + sw2 * 2, 4, -9); c.closePath();
+  c.fillStyle = '#a3142c'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  // trailing (far) leg
+  taper(c, [-12, 7], [-26, 12], [-36, 11], 13, 9.5, HSK_D, .22);
+  taper(c, [-36, 11], [-48, 10], [-60, 4], 9.5, 6, HSK_D, .25);
+  band(c, -57, 4.5, -.4, 8);
+  c.beginPath(); c.ellipse(-63, 3, 5, 3, -.4, 0, TAU); c.fillStyle = HSK_D; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  // gada: golden mace resting over the shoulder
+  c.save(); c.translate(11, -23); c.rotate(.42);
+  rr(c, -40, -3.2, 50, 6.4, 3); const sg = c.createLinearGradient(0, -3, 0, 3); sg.addColorStop(0, '#ffe08a'); sg.addColorStop(1, GOLD2); c.fillStyle = sg; c.fill(); c.lineWidth = 2.2; c.strokeStyle = INK; c.stroke();
+  for (const bx of [-30, -6, 4]) band(c, bx, 0, 0, 8, '#e9a520');
+  blob(c, 12, 0, 4, GOLD, 2);
+  c.beginPath(); c.moveTo(-41, -6); c.lineTo(-45, -7.5); c.lineTo(-45, 7.5); c.lineTo(-41, 6); c.closePath(); c.fillStyle = '#e9a520'; c.fill(); c.stroke();
+  const hg = c.createRadialGradient(-58, -6, 2, -55, 0, 17); hg.addColorStop(0, '#fff6c4'); hg.addColorStop(.45, GOLD); hg.addColorStop(1, '#b8740c');
+  c.beginPath(); c.ellipse(-56, 0, 15, 14, 0, 0, TAU); c.fillStyle = hg; c.fill(); c.lineWidth = 2.8; c.strokeStyle = INK; c.stroke();
+  c.lineWidth = 1.6; c.strokeStyle = 'rgba(120,70,0,.85)';
+  for (const k of [-.55, 0, .55]) { c.beginPath(); c.ellipse(-56, 0, 15 * Math.abs(Math.cos(k * 2)) + .5, 14, 0, -Math.PI / 2, Math.PI / 2, k < 0); c.stroke(); }
+  c.beginPath(); c.ellipse(-56, 0, 15, 4, 0, 0, TAU); c.stroke();
+  c.beginPath(); c.moveTo(-71, 0); c.lineTo(-78, -3); c.lineTo(-80, 0); c.lineTo(-78, 3); c.closePath(); c.fillStyle = GOLD; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  blob(c, -56, -14.5, 2.6, '#d62828', 1.4);
   c.restore();
   // arm holding the gada
-  limb(c, [[10, -6], [3, -9], [-2, -20]], 7, FUR2); blob(c, -2, -20, 4.8, FUR, 2.2);
-  // dhoti and red sash
-  c.beginPath(); c.moveTo(-18, 3); c.quadraticCurveTo(-32, 10 + sw * 1.5, -46, 4 - sw); c.quadraticCurveTo(-33, 17 + sw, -18, 11); c.closePath();
-  c.fillStyle = '#d62828'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
-  c.beginPath(); c.ellipse(-11, 6, 15, 10, .15, 0, TAU); c.fillStyle = '#ffd23f'; c.fill(); c.lineWidth = 3; c.stroke();
-  // bent leg
-  limb(c, [[-6, 10], [-12, 25], [-31, 23]], 8, FUR);
-  // torso
-  c.beginPath(); c.ellipse(8, -2, 21, 12, -.12, 0, TAU); c.fillStyle = FUR; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
-  c.beginPath(); c.ellipse(14, 2, 10, 6, -.12, 0, TAU); c.fillStyle = 'rgba(255,214,160,.5)'; c.fill();
-  c.beginPath(); c.arc(25, -9, 8, .7, 2.3); c.lineWidth = 3; c.strokeStyle = GOLD; c.stroke();
-  // head
-  blob(c, 34, -16, 11, FUR, 3);
-  blob(c, 27, -13, 4, FACE, 2);
-  c.beginPath(); c.ellipse(41.5, -11.5, 7.5, 6, 0, 0, TAU); c.fillStyle = FACE; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
-  c.beginPath(); c.ellipse(37, -18.5, 2.4, 2.9, 0, 0, TAU); c.fillStyle = '#fff'; c.fill();
-  c.beginPath(); c.arc(37.8, -18.4, 1.4, 0, TAU); c.fillStyle = INK; c.fill();
-  c.lineWidth = 1.8; c.beginPath(); c.moveTo(33, -23); c.lineTo(40, -22.5); c.stroke();
-  c.beginPath(); c.arc(42, -10, 3, .3, 1.7); c.stroke();
-  // mukut (crown)
-  c.beginPath(); c.moveTo(25, -23); c.lineTo(27, -33); c.lineTo(30.5, -28); c.lineTo(34, -41); c.lineTo(37.5, -28); c.lineTo(41, -33); c.lineTo(43, -23); c.closePath();
-  c.fillStyle = GOLD; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
-  blob(c, 34, -27.5, 2.2, '#d62828', 1.4);
+  taper(c, [5, -12], [-4, -15], [-8, -21], 11, 8.5, HSK_D, .25);
+  taper(c, [-8, -21], [-2, -27], [9, -25], 8.5, 7, HSK_D, .2);
+  band(c, -3, -15.5, 1.2, 9);
+  blob(c, 10, -25, 5, HSK, 2.2);
+  // torso: broad heroic chest, narrow waist
+  c.beginPath(); c.moveTo(-17, -3); c.quadraticCurveTo(-14, -16, 3, -17); c.quadraticCurveTo(19, -19, 27, -11); c.quadraticCurveTo(33, -2, 25, 6);
+  c.quadraticCurveTo(13, 14, -3, 12); c.quadraticCurveTo(-16, 10, -17, -3); c.closePath();
+  const tg = c.createLinearGradient(0, -18, 0, 13); tg.addColorStop(0, HSK_L); tg.addColorStop(.45, HSK); tg.addColorStop(1, HSK_D);
+  c.fillStyle = tg; c.fill(); c.lineWidth = 2.8; c.strokeStyle = INK; c.stroke();
+  c.lineWidth = 1.6; c.strokeStyle = 'rgba(122,40,10,.6)';
+  c.beginPath(); c.moveTo(14, -1); c.quadraticCurveTo(21, 6, 27, 1); c.stroke();
+  c.beginPath(); c.moveTo(4, 6); c.quadraticCurveTo(7, 10, 10, 8); c.moveTo(-3, 7); c.quadraticCurveTo(0, 11, 3, 9); c.stroke();
+  c.beginPath(); c.moveTo(-12, -9); c.quadraticCurveTo(4, -16, 22, -14); c.lineWidth = 2; c.strokeStyle = 'rgba(255,214,150,.75)'; c.stroke();
+  c.beginPath(); c.moveTo(8, -16); c.quadraticCurveTo(2, -2, -6, 11); c.lineWidth = 1.4; c.strokeStyle = '#fff1c8'; c.stroke();
+  // dhoti with gold border, and a red waist sash
+  c.beginPath(); c.moveTo(-5, -1); c.quadraticCurveTo(-14, -7, -24, -2); c.quadraticCurveTo(-29, 8, -21, 16); c.quadraticCurveTo(-10, 19, -2, 12); c.closePath();
+  const dg = c.createLinearGradient(0, -6, 0, 18); dg.addColorStop(0, '#ffd34d'); dg.addColorStop(1, '#f29a12'); c.fillStyle = dg; c.fill(); c.lineWidth = 2.6; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(-22, 14); c.quadraticCurveTo(-11, 18, -3, 11.5); c.lineWidth = 2.4; c.strokeStyle = '#c8202a'; c.stroke();
+  c.lineWidth = 1.2; c.strokeStyle = 'rgba(150,80,0,.7)'; c.beginPath(); c.moveTo(-18, 0); c.quadraticCurveTo(-16, 8, -19, 13); c.moveTo(-12, -2); c.quadraticCurveTo(-10, 6, -12, 14); c.stroke();
+  c.beginPath(); c.moveTo(-4, -4); c.quadraticCurveTo(-1, 4, -4, 13); c.lineWidth = 4.5; c.strokeStyle = '#d0202e'; c.stroke(); c.lineWidth = 1.2; c.strokeStyle = INK; c.stroke();
+  // near leg, knee bent
+  taper(c, [-11, 11], [-17, 22], [-25, 26], 13.5, 10, HSK, .22);
+  taper(c, [-25, 26], [-37, 30], [-49, 25], 10, 6.5, HSK, .28);
+  band(c, -46, 26, -.5, 8.5);
+  c.beginPath(); c.ellipse(-52, 24, 5.5, 3.2, -.35, 0, TAU); c.fillStyle = HSK; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  // necklace
+  c.beginPath(); c.arc(24, -10, 8.5, .55, 2.25); c.lineWidth = 2.6; c.strokeStyle = GOLD; c.stroke();
+  blob(c, 21, -2, 2.2, '#d62828', 1.2);
+  // head (drawn a little larger than life, as in devotional art)
+  const hx = 37, hy = -22;
+  c.save(); c.translate(hx, hy + 4); c.scale(1.2, 1.2); c.translate(-hx, -hy - 4);
+  c.beginPath(); c.arc(hx, hy, 12.5, 0, TAU); c.fillStyle = HSK; c.fill(); c.lineWidth = 2.8; c.strokeStyle = INK; c.stroke();
+  // face mask and the strong, rounded jaw
+  c.beginPath(); c.moveTo(33, -31); c.quadraticCurveTo(43, -35, 48, -27); c.quadraticCurveTo(51.5, -22, 51.5, -17); c.quadraticCurveTo(53, -9.5, 47, -8);
+  c.quadraticCurveTo(41, -3, 33, -10); c.quadraticCurveTo(29, -18, 33, -31); c.closePath();
+  const fg = c.createLinearGradient(0, -34, 0, -6); fg.addColorStop(0, '#ffe2b8'); fg.addColorStop(1, HFACE); c.fillStyle = fg; c.fill(); c.lineWidth = 2.4; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.arc(41.5, -11, 6, .2, 2.6); c.lineWidth = 1.5; c.strokeStyle = 'rgba(160,90,40,.8)'; c.stroke();
+  c.beginPath(); c.ellipse(50.2, -18.5, 2.2, 1.6, .3, 0, TAU); c.fillStyle = INK; c.fill();
+  c.beginPath(); c.moveTo(49, -12.5); c.quadraticCurveTo(46, -10, 43, -11.5); c.lineWidth = 1.7; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.ellipse(42, -24, 3.6, 2.7, -.15, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 1.3; c.stroke();
+  c.beginPath(); c.arc(43, -24, 1.9, 0, TAU); c.fillStyle = '#3a1a08'; c.fill();
+  c.beginPath(); c.arc(43.6, -24.6, .6, 0, TAU); c.fillStyle = '#fff'; c.fill();
+  c.beginPath(); c.moveTo(37.5, -28.5); c.quadraticCurveTo(42, -30.5, 46.5, -28); c.lineWidth = 2.4; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(45, -31); c.lineTo(45, -28.5); c.lineWidth = 2; c.strokeStyle = '#d62828'; c.stroke();
+  // ear with a golden kundal
+  c.beginPath(); c.ellipse(31, -20, 3.8, 5, 0, 0, TAU); c.fillStyle = HFACE_D; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.arc(31, -12.5, 3, 0, TAU); c.lineWidth = 2; c.strokeStyle = GOLD; c.stroke();
+  // mukut: tiered golden crown
+  const cg = c.createLinearGradient(0, -56, 0, -31); cg.addColorStop(0, '#fff3b0'); cg.addColorStop(.5, GOLD); cg.addColorStop(1, '#d08a10');
+  c.beginPath(); c.moveTo(28, -31); c.lineTo(29.5, -38); c.lineTo(33, -36); c.lineTo(35, -46); c.lineTo(38, -42); c.lineTo(40, -56); c.lineTo(42, -42); c.lineTo(45, -46); c.lineTo(46.5, -36); c.lineTo(49.5, -38); c.lineTo(48.5, -31); c.closePath();
+  c.fillStyle = cg; c.fill(); c.lineWidth = 2.2; c.strokeStyle = INK; c.stroke();
+  rr(c, 27.5, -34, 22, 4.5, 1.5); c.fillStyle = '#e9a520'; c.fill(); c.lineWidth = 1.8; c.stroke();
+  for (const gx of [31, 38.5, 46]) blob(c, gx, -31.8, 1.5, gx === 38.5 ? '#d62828' : '#3fbf8f', .8);
+  blob(c, 40, -45, 2.2, '#d62828', 1); blob(c, 40, -57.5, 1.8, GOLD, 1);
+  c.beginPath(); c.moveTo(28, -33); c.quadraticCurveTo(22, -36, 23, -42); c.lineWidth = 2.4; c.strokeStyle = GOLD; c.stroke();
+  c.restore();
+  // near scarf end over the shoulder
+  c.beginPath(); c.moveTo(13, -17); c.bezierCurveTo(0, -23 + sw2 * 2, -16, -16 + sw2 * 4, -34, -30 + sw2 * 6); c.lineTo(-30, -22 + sw2 * 5); c.bezierCurveTo(-14, -10 + sw2 * 3, 0, -15 + sw2, 13, -11); c.closePath();
+  c.fillStyle = '#e02443'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
   // arm reaching forward
-  limb(c, [[18, -6], [32, -1], [50, -6]], 7, FUR); blob(c, 52, -6, 5.2, FUR, 2.5);
+  taper(c, [18, -9], [28, -1], [37, 0], 12, 8.5, HSK, .25);
+  taper(c, [37, 0], [47, -1], [53, -5], 8.5, 7, HSK, .22);
+  band(c, 26, -3.5, .6, 10); band(c, 50, -3.5, 1.9, 8);
+  c.beginPath(); c.ellipse(57, -6, 6, 5.2, -.3, 0, TAU); c.fillStyle = HSK; c.fill(); c.lineWidth = 2.3; c.strokeStyle = INK; c.stroke();
+  c.lineWidth = 1.2; c.beginPath(); c.moveTo(58, -10); c.lineTo(58.5, -3); c.moveTo(61, -9) ; c.lineTo(61.5, -4); c.stroke();
   if (o.ring) { // Rama's mudrika held out
-    const rg = c.createRadialGradient(57, -11, 1, 57, -11, 22); rg.addColorStop(0, 'rgba(255,240,170,.9)'); rg.addColorStop(1, 'rgba(255,200,61,0)');
-    c.fillStyle = rg; c.beginPath(); c.arc(57, -11, 22, 0, TAU); c.fill();
-    c.beginPath(); c.arc(57, -11, 5, 0, TAU); c.lineWidth = 3; c.strokeStyle = GOLD; c.stroke(); blob(c, 57, -16.5, 2, '#d62828', 1);
+    const rg = c.createRadialGradient(62, -10, 1, 62, -10, 22); rg.addColorStop(0, 'rgba(255,240,170,.9)'); rg.addColorStop(1, 'rgba(255,200,61,0)');
+    c.fillStyle = rg; c.beginPath(); c.arc(62, -10, 22, 0, TAU); c.fill();
+    c.beginPath(); c.arc(63, -11, 4.5, 0, TAU); c.lineWidth = 2.6; c.strokeStyle = GOLD; c.stroke(); blob(c, 63, -16, 1.8, '#d62828', 1);
   }
   c.restore();
 }
@@ -575,6 +645,138 @@ const THEMES = {
 const CLOUDS = Array.from({ length: 10 }, (_, i) => ({ x: i * 240 + (i * 97 % 130), y: 40 + (i * 53 % 170), s: .55 + (i * 37 % 80) / 100, par: .06 + (i % 3) * .07 }));
 const STARS = Array.from({ length: 70 }, (_, i) => ({ x: (i * 173) % 1500, y: (i * 89) % 300, r: .6 + (i % 3) * .5, ph: i }));
 
+const hash = n => { n = Math.sin(n * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
+const hexA = (h, a) => `rgba(${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)},${a})`;
+function drawFarSea(c, th, camX, t, sunX, glit) {
+  const W = View.w;
+  const g = c.createLinearGradient(0, HORIZON, 0, SURF + 30); g.addColorStop(0, th.far[0]); g.addColorStop(1, th.far[1]);
+  c.fillStyle = g; c.fillRect(-20, HORIZON, W + 40, SURF - HORIZON + 30);
+  // the sky reflected in a haze along the horizon
+  const hz = c.createLinearGradient(0, HORIZON, 0, HORIZON + 30); hz.addColorStop(0, hexA(th.sky[3], .6)); hz.addColorStop(1, hexA(th.sky[3], 0));
+  c.fillStyle = hz; c.fillRect(-20, HORIZON, W + 40, 30);
+  c.fillStyle = hexA(th.sky[3], .8); c.fillRect(-20, HORIZON, W + 40, 1.5);
+  // sun / moon path: broken glints widening towards the viewer
+  if (glit) {
+    const sg = c.createLinearGradient(0, HORIZON, 0, SURF); sg.addColorStop(0, th.glit.replace(/[\d.]+\)$/, '.35)')); sg.addColorStop(1, th.glit.replace(/[\d.]+\)$/, '0)'));
+    c.fillStyle = sg; c.beginPath(); c.moveTo(sunX - 14, HORIZON); c.lineTo(sunX + 14, HORIZON); c.lineTo(sunX + 120, SURF); c.lineTo(sunX - 120, SURF); c.closePath(); c.fill();
+    c.fillStyle = th.glit;
+    for (let row = 0; row < 24; row++) {
+      const k = row / 23, y = HORIZON + 3 + Math.pow(k, 1.35) * (SURF - HORIZON - 6), w = 10 + k * 100;
+      for (let j = 0; j < 3; j++) {
+        const slot = Math.floor(t * 2.5 + hash(row * 3 + j) * 9), h = hash(row * 13.7 + j * 5.1 + slot);
+        const len = 5 + k * 26 * (.4 + hash(row + j * 7 + slot)), x = sunX + (h - .5) * 2 * w;
+        c.globalAlpha = .35 + .65 * hash(row * 31 + j + slot * 3); c.fillRect(x - len / 2, y, len, 1.2 + k * 1.8);
+      }
+    }
+    c.globalAlpha = 1;
+  }
+  // wave strokes in perspective: small and dense far away, larger close by
+  for (let row = 0; row < 15; row++) {
+    const k = row / 14, y = HORIZON + 5 + Math.pow(k, 1.55) * (SURF - HORIZON - 10), par = .06 + k * .55, gap = 34 + k * 80, len = 7 + k * 30;
+    const off = camX * par + t * (4 + k * 9), n0 = Math.floor((off - 80) / gap);
+    c.lineWidth = .9 + k * 1.7;
+    for (let n = n0; n * gap - off < W + 80; n++) {
+      const x = n * gap - off + hash(n * 7.3 + row * 1.9) * gap * .7, l = len * (.55 + hash(n * 1.7 + row * 3.1) * .9);
+      c.strokeStyle = `rgba(${th.line},${.16 + k * .32})`;
+      c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + l / 2, y - 1.2 - k * 3, x + l, y); c.stroke();
+      if (k > .45) { c.strokeStyle = `rgba(0,10,40,${(k - .45) * .35})`; c.beginPath(); c.moveTo(x + 2, y + 2.5); c.quadraticCurveTo(x + l / 2, y + 1, x + l - 2, y + 2.5); c.stroke(); }
+    }
+  }
+}
+function swell(c, W, camX, t, base, amp, par, spd) {
+  const pts = [];
+  for (let x = -20; x <= W + 20; x += 8) { const u = x + camX * par; pts.push([x, base + Math.sin(u * .013 + t * spd) * amp + Math.sin(u * .037 - t * spd * 1.4) * amp * .45]); }
+  return pts;
+}
+function drawNearSea(c, th, camX, t, sunX) {
+  const W = View.w;
+  // back swell, a little higher and slower than the surface
+  const back = swell(c, W, camX, t, SURF - 9, 4, .75, 1.1);
+  c.beginPath(); c.moveTo(-20, VH + 20); back.forEach(([x, y]) => c.lineTo(x, y)); c.lineTo(W + 20, VH + 20); c.closePath();
+  c.fillStyle = th.far[1]; c.fill();
+  c.beginPath(); back.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.lineWidth = 2; c.strokeStyle = `rgba(${th.line},.45)`; c.stroke();
+  // the main surface (matches surfY, which the physics uses)
+  const pts = []; for (let x = -20; x <= W + 20; x += 8) pts.push([x, surfY(x + camX, t)]);
+  const fw = c.createLinearGradient(0, SURF - 10, 0, VH); fw.addColorStop(0, th.near[0]); fw.addColorStop(.5, th.near[1]); fw.addColorStop(1, th.near[1]);
+  c.beginPath(); c.moveTo(-20, VH + 20); pts.forEach(([x, y]) => c.lineTo(x, y)); c.lineTo(W + 20, VH + 20); c.closePath(); c.fillStyle = fw; c.fill();
+  // light bands under the surface
+  c.strokeStyle = `rgba(${th.line},.12)`; c.lineWidth = 2;
+  for (let i = 0; i < 6; i++) { const y = SURF + 16 + i * 14, off = ((camX * (1.05 + i * .05) + t * 20) % 160 + 160) % 160; c.beginPath(); for (let x = -off; x < W + 20; x += 160) { c.moveTo(x + hash(i * 9) * 60, y); c.lineTo(x + 50 + hash(i * 9) * 60, y + 1); } c.stroke(); }
+  // crest line with foam caps on each rise
+  c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.lineWidth = 3; c.strokeStyle = `rgba(${th.line},.9)`; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.85)';
+  for (let i = 1; i < pts.length - 1; i++) if (pts[i][1] < pts[i - 1][1] && pts[i][1] <= pts[i + 1][1]) {
+    const [x, y] = pts[i]; c.beginPath(); c.ellipse(x, y + 1, 9, 2.6, 0, 0, TAU); c.fill(); c.beginPath(); c.arc(x - 9, y + 3, 1.6, 0, TAU); c.arc(x + 10, y + 3.5, 1.3, 0, TAU); c.fill();
+  }
+  // front swell closest to the viewer
+  const front = swell(c, W, camX, t, SURF + 52, 6, 1.3, 1.5);
+  const fg = c.createLinearGradient(0, SURF + 40, 0, VH); fg.addColorStop(0, th.near[0]); fg.addColorStop(1, th.near[1]);
+  c.beginPath(); c.moveTo(-20, VH + 20); front.forEach(([x, y]) => c.lineTo(x, y)); c.lineTo(W + 20, VH + 20); c.closePath(); c.globalAlpha = .75; c.fillStyle = fg; c.fill(); c.globalAlpha = 1;
+  c.beginPath(); front.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.lineWidth = 2.5; c.strokeStyle = `rgba(${th.line},.6)`; c.stroke();
+  // twinkling sparkles, gathered under the sun
+  c.fillStyle = '#fffbe6';
+  for (let i = 0; i < 16; i++) {
+    const slot = Math.floor(t * 1.6 + hash(i) * 5), h = hash(i * 11.3 + slot), a = Math.sin((t * 1.6 + hash(i) * 5 - slot) * Math.PI);
+    const x = i < 8 ? sunX + (h - .5) * 260 : ((hash(i * 3 + slot) * (W + 200) - camX * .2) % (W + 100) + W + 100) % (W + 100), y = SURF + 4 + hash(i * 5.7 + slot) * 70, r = 2 + 2.5 * a;
+    if (a <= 0) continue; c.globalAlpha = a; c.beginPath(); c.moveTo(x, y - r * 1.6); c.lineTo(x + r * .35, y); c.lineTo(x, y + r * 1.6); c.lineTo(x - r * .35, y); c.closePath(); c.moveTo(x - r * 1.6, y); c.lineTo(x, y + r * .3); c.lineTo(x + r * 1.6, y); c.lineTo(x, y - r * .3); c.closePath(); c.fill();
+  }
+  c.globalAlpha = 1;
+}
+function drawTree(c, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  c.fillStyle = '#4a2f1c'; c.fillRect(-2.5, -6, 5, 16);
+  for (const [dx, dy, r, col] of [[-9, -10, 11, '#174a33'], [9, -10, 11, '#174a33'], [0, -18, 13, '#1f5e3e'], [-5, -24, 9, '#2a7a4c'], [6, -21, 8, '#2a7a4c']]) { c.beginPath(); c.arc(dx, dy, r, 0, TAU); c.fillStyle = col; c.fill(); }
+  c.beginPath(); c.arc(4, -27, 5, 0, TAU); c.fillStyle = 'rgba(255,170,90,.5)'; c.fill();
+  c.restore();
+}
+function drawPalm(c, x, y, s, t) {
+  c.save(); c.translate(x, y); c.scale(s, s); c.lineCap = 'round';
+  c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(6, -24, 2, -48); c.lineWidth = 5; c.strokeStyle = '#5a3a22'; c.stroke();
+  const sway = Math.sin(t * 1.5 + x) * .06;
+  for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i - 2.5) * .55 + sway; c.beginPath(); c.moveTo(2, -48); c.quadraticCurveTo(2 + Math.cos(a) * 16, -48 + Math.sin(a) * 16 - 6, 2 + Math.cos(a) * 28, -48 + Math.sin(a) * 28 + 6); c.lineWidth = 4.5; c.strokeStyle = i % 2 ? '#1f5e3e' : '#2a7a4c'; c.stroke(); }
+  c.restore();
+}
+function drawMahendra(c, ox, t) {
+  c.save(); c.translate(ox, 0); c.lineJoin = 'round';
+  // hazy far ridge for depth
+  c.beginPath(); c.moveTo(-100, HORIZON + 4); c.lineTo(-40, 300); c.quadraticCurveTo(40, 284, 120, 304); c.quadraticCurveTo(200, 288, 290, 310); c.quadraticCurveTo(380, 300, 470, 318); c.quadraticCurveTo(540, 322, 600, HORIZON + 4); c.closePath();
+  const rgf = c.createLinearGradient(0, 284, 0, HORIZON + 4); rgf.addColorStop(0, 'rgba(160,80,140,.5)'); rgf.addColorStop(1, 'rgba(255,150,120,.25)'); c.fillStyle = rgf; c.fill();
+  // main mountain
+  const sil = [[-460, 560], [-430, 400], [-400, 300, -330, 262], [-280, 240, -240, 270], [-190, 300, -140, 282], [-60, 222, 0, 236], [62, 252, 112, 300], [132, 318, 162, 316], [276, 316], [300, 318, 318, 342], [380, 382, 452, 406], [560, 440, 664, 560]];
+  const path = () => { c.beginPath(); sil.forEach((q, i) => { if (!i) c.moveTo(q[0], q[1]); else if (q.length === 2) c.lineTo(q[0], q[1]); else c.quadraticCurveTo(q[0], q[1], q[2], q[3]); }); c.closePath(); };
+  const g = c.createLinearGradient(0, 220, 0, 540); g.addColorStop(0, '#3a8a5e'); g.addColorStop(.45, '#1d5440'); g.addColorStop(1, '#0b2a28');
+  path(); c.fillStyle = g; c.fill(); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
+  // warm sunset rim along the sun-facing slopes
+  c.beginPath(); c.moveTo(-330, 263); c.quadraticCurveTo(-280, 241, -240, 271); c.moveTo(0, 237); c.quadraticCurveTo(62, 253, 112, 301); c.moveTo(276, 317); c.quadraticCurveTo(300, 319, 318, 343); c.quadraticCurveTo(380, 383, 452, 407);
+  c.lineWidth = 3.5; c.strokeStyle = 'rgba(255,176,100,.85)'; c.stroke();
+  // rock faces
+  const rock = (pts, lit) => {
+    c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath();
+    const rg = c.createLinearGradient(pts[0][0], 0, pts[2][0], 0); rg.addColorStop(0, '#5e4a3c'); rg.addColorStop(1, '#8e7258'); c.fillStyle = rg; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+    c.beginPath(); c.moveTo(lit[0][0], lit[0][1]); lit.slice(1).forEach(([x, y]) => c.lineTo(x, y)); c.lineWidth = 2.5; c.strokeStyle = 'rgba(255,186,110,.9)'; c.stroke();
+  };
+  rock([[150, 317], [276, 317], [300, 333], [288, 362], [244, 374], [196, 366], [158, 344]], [[276, 318], [298, 334], [288, 360]]);
+  rock([[-44, 242], [0, 237], [32, 252], [14, 292], [-28, 302], [-52, 272]], [[1, 238], [31, 253], [15, 290]]);
+  rock([[-332, 264], [-292, 252], [-268, 292], [-308, 322], [-346, 302]], [[-292, 253], [-269, 291]]);
+  rock([[330, 352], [402, 388], [384, 424], [332, 414], [312, 382]], [[402, 389], [385, 422]]);
+  c.lineWidth = 1.5; c.strokeStyle = 'rgba(40,20,10,.5)';
+  c.beginPath(); c.moveTo(190, 330); c.lineTo(214, 356); c.moveTo(240, 324); c.lineTo(252, 350); c.moveTo(-20, 256); c.lineTo(-8, 284); c.stroke();
+  // grass along the launch plateau
+  c.strokeStyle = '#6fbf63'; c.lineWidth = 2;
+  for (let x = 166; x < 274; x += 7) { const h = 4 + hash(x) * 5; c.beginPath(); c.moveTo(x, 317); c.lineTo(x - 2 + Math.sin(t * 2 + x) * 1.5, 317 - h); c.stroke(); }
+  // forest on the slopes
+  for (const [x, y, s] of [[-392, 352, 1.1], [-300, 300, .9], [-214, 296, 1], [-120, 294, .85], [-66, 258, .9], [62, 268, 1], [102, 300, .8], [346, 374, 1], [424, 402, 1.1], [500, 432, 1.25], [-254, 420, 1.35], [-86, 382, 1.45], [216, 424, 1.3], [26, 360, 1.25], [-380, 470, 1.5], [120, 470, 1.5], [400, 480, 1.4]]) drawTree(c, x, y, s);
+  drawPalm(c, 306, 346, 1, t); drawPalm(c, -170, 290, .9, t); drawPalm(c, 560, 452, 1.2, t);
+  c.restore();
+}
+function drawShoreFoam(c, x0, x1, t, camX) { // surf breaking where land meets the sea
+  c.fillStyle = 'rgba(255,255,255,.85)';
+  for (let x = x0; x < x1; x += 22) {
+    const y = surfY(x + camX, t) + 2, k = Math.sin(t * 2.2 + x * .05);
+    c.beginPath(); c.ellipse(x, y, 13 + k * 4, 3.2, 0, 0, TAU); c.fill();
+    c.beginPath(); c.arc(x + 9, y - 3 - k * 2, 2, 0, TAU); c.fill();
+  }
+}
 class FlightLevel extends Level {
   constructor(def) {
     super(def);
@@ -790,20 +992,7 @@ class FlightLevel extends Level {
     // decorative clouds
     const span = 2400;
     for (const cl of CLOUDS) { const x = ((cl.x - camX * cl.par) % span + span) % span - 200; drawCloud(c, x, cl.y, cl.s, th.cloud); }
-    // distant ocean
-    const oc = c.createLinearGradient(0, HORIZON, 0, SURF);
-    oc.addColorStop(0, th.far[0]); oc.addColorStop(1, th.far[1]);
-    c.fillStyle = oc; c.fillRect(-20, HORIZON, W + 40, SURF - HORIZON + 30);
-    if (sy > 200 || th.stars) {
-      c.fillStyle = th.glit;
-      for (let i = 0; i < 11; i++) { const y = HORIZON + 5 + i * 9, w = (34 - i * 2) * (.6 + .4 * Math.sin(t * 3 + i * 1.7)); c.fillRect(sx - w, y, w * 2, 2.5); }
-    }
-    for (let k = 0; k < 4; k++) {
-      const y = 344 + k * 22, par = .2 + .18 * k, off = -((camX * par) % 46);
-      c.strokeStyle = `rgba(${th.line},${.22 + .1 * k})`; c.lineWidth = 2; c.beginPath();
-      for (let x = off - 46; x < W + 46; x += 46) { c.moveTo(x, y); c.quadraticCurveTo(x + 11, y - 3 - k, x + 22, y); }
-      c.stroke();
-    }
+    drawFarSea(c, th, camX, t, sx, sy > 200 || th.stars);
     this.drawBack(c, camX);
     const L = camX - 300, R = camX + W + 300;
     for (const o of this.objs) {
@@ -814,13 +1003,7 @@ class FlightLevel extends Level {
       else if (o.type === 'cp') this.drawCp(c, x);
       else this.objDraw(c, o, x, 'back');
     }
-    // near sea surface
-    const fw = c.createLinearGradient(0, SURF - 10, 0, VH); fw.addColorStop(0, th.near[0]); fw.addColorStop(1, th.near[1]);
-    c.beginPath(); c.moveTo(-20, VH + 20);
-    for (let x = -20; x <= W + 20; x += 12) c.lineTo(x, surfY(x + camX, t));
-    c.lineTo(W + 20, VH + 20); c.closePath(); c.fillStyle = fw; c.fill();
-    c.beginPath(); for (let x = -20; x <= W + 20; x += 12) { const y = surfY(x + camX, t); x === -20 ? c.moveTo(x, y) : c.lineTo(x, y); }
-    c.lineWidth = 3; c.strokeStyle = `rgba(${th.line},.85)`; c.stroke();
+    drawNearSea(c, th, camX, t, sx);
     this.drawShadow(c, camX);
     for (const o of this.objs) { if (!o.dead && o.x > L - 600 && o.x < R) this.objDraw(c, o, o.x - camX, 'mid'); }
     this.drawMid(c, camX);
@@ -894,17 +1077,6 @@ class FlightLevel extends Level {
     drawFlame(c, x, y - 8, 1.5 + Math.sin(t * 9) * .05, true);
   }
 }
-function drawMahendra(c, ox) {
-  const pts = [[-420, 560], [-380, 380], [-250, 262], [-140, 330], [10, 244], [120, 322], [168, 316], [272, 316], [330, 362], [470, 418], [640, 560]];
-  c.save(); c.translate(ox, 0);
-  const g = c.createLinearGradient(0, 240, 0, 540); g.addColorStop(0, '#2f7a5c'); g.addColorStop(1, '#0d2f2c');
-  c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fillStyle = g; c.fill();
-  c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
-  c.beginPath(); for (let i = 2; i < 8; i++) { const [x, y] = pts[i]; i === 2 ? c.moveTo(x, y + 2) : c.lineTo(x, y + 2); } c.lineWidth = 3; c.strokeStyle = 'rgba(255,170,90,.75)'; c.stroke();
-  c.fillStyle = '#1e5a3e';
-  for (const [x, y, r] of [[-300, 320, 16], [-200, 330, 14], [-60, 300, 15], [60, 300, 13], [360, 392, 15], [420, 412, 13], [-330, 420, 18], [-180, 400, 20], [240, 440, 20]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
-  c.restore();
-}
 function drawMainaka(c, x, rise) {
   const h = 300 * rise, base = SURF + 10;
   c.save(); c.translate(x, base);
@@ -958,11 +1130,13 @@ function genLeap() {
 class LeapLevel extends FlightLevel {
   config() { return { len: LEAP_LEN, par: 100, theme: THEMES.sunset }; }
   gen() { return genLeap(); }
-  startPose(p) { p.y = 293; p.ang = -.55; }
+  startPose(p) { p.y = 262; p.ang = -.9; }
   leapVy() { return this.cp ? -200 : -430; }
+  drawMid(c, camX) { if (camX < 900) drawShoreFoam(c, -440 - camX, 520 - camX, this.t, camX); }
+  drawShadow(c, camX) { if (this.state !== 'ready' || this.cp) super.drawShadow(c, camX); }
   onLeap() { this.showHint('fly', 'Release to glide · ← → to slow down or speed up', 'Release FLY to glide · ◀ ▶ to slow down or speed up'); }
   drawBack(c, camX) {
-    if (camX < 900) drawMahendra(c, -camX);
+    if (camX < 900) drawMahendra(c, -camX, this.t);
     const rise = smooth((camX + View.w - (LEAP_LEN - 900)) / 1300);
     if (rise > 0) drawMainaka(c, LEAP_LEN + 520 - camX, rise);
   }
