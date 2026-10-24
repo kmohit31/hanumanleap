@@ -745,7 +745,7 @@ class Level {
     if (this.speech) {
       const s = this.speech, a = Math.min(1, s.t * 4, (s.dur - s.t) * 2);
       c.globalAlpha = a; c.font = `600 18px ${UIF}`;
-      const lines = wrapLines(c, s.s, Math.min(620, View.w - 120)), w = Math.max(...lines.map(l => c.measureText(l).width)) + 40, h = 40 + lines.length * 23, sy = T + (this.hint ? 120 : 82);
+      const lines = wrapLines(c, s.s, Math.min(620, View.w - 120)), w = Math.max(...lines.map(l => c.measureText(l).width)) + 40, h = 40 + lines.length * 23, sy = T + (this.hint ? 124 : 96);
       rr(c, View.w / 2 - w / 2, sy, w, h, 14); c.fillStyle = 'rgba(255,244,220,.94)'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
       text(c, s.who, View.w / 2 - w / 2 + 16, sy + 15, { size: 17, font: TF, w: 400, color: '#b8460e', stroke: false });
       lines.forEach((l, i) => text(c, l, View.w / 2, sy + 38 + i * 23, { size: 18, w: 600, align: 'center', stroke: false, color: INK }));
@@ -1369,59 +1369,83 @@ class MainakaLevel extends FlightLevel {
 }
 
 // ---------- Level 3: Surasa, mother of serpents ----------
-function drawSurasa(c, h, t, bow) {
-  const s = h.s, open = h.open, hx = h.x, hy = h.y;
+function drawSurasa(c, h, t, bow) { // the serpent-mother: turquoise face, copper hair, a hinged jaw and a coiling serpent body
+  const u = h.s * .95, open = h.open, hx = h.x, hy = h.y, calm = bow > .3, sw = Math.sin(t * 1.6);
+  const Hx = hx + 36 * u, Hy = hy, a = Math.asin(Math.min(.92, open / (220 * u)));
+  const SK = '#2bb4c8', SKL = '#72dce8', SKD = '#18839a';
+  const up = (x, y) => [Hx + x * Math.cos(a) - y * Math.sin(a), Hy + x * Math.sin(a) + y * Math.cos(a)]; // upper-head frame (tilted up by a)
+  const lo = (x, y) => [Hx + x * Math.cos(a) + y * Math.sin(a), Hy - x * Math.sin(a) + y * Math.cos(a)]; // lower-jaw frame (tilted down by a)
   c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
-  // a far coil arching out of the water for depth
-  c.beginPath(); c.moveTo(hx + 300, SURF + 30); c.quadraticCurveTo(hx + 360, SURF - 90, hx + 430, SURF + 30);
-  c.lineWidth = 50; c.strokeStyle = INK; c.stroke(); c.lineWidth = 44; c.strokeStyle = '#17705a'; c.stroke(); c.lineWidth = 10; c.strokeStyle = 'rgba(160,240,200,.35)'; c.stroke();
-  // main body rising from the sea
-  const body = () => { c.beginPath(); c.moveTo(hx + 250, SURF + 50); c.bezierCurveTo(hx + 360, SURF - 150, hx + 40, hy + 200, hx + 95 * s, hy + 20); };
-  body(); c.lineWidth = 92; c.strokeStyle = INK; c.stroke(); c.lineWidth = 84; c.strokeStyle = '#1f8a6e'; c.stroke();
-  c.setLineDash([3, 12]); c.lineWidth = 78; c.strokeStyle = 'rgba(10,70,55,.55)'; c.stroke(); c.setLineDash([]);
-  c.save(); c.translate(10, 8); body(); c.lineWidth = 30; c.strokeStyle = '#efe0a8'; c.stroke(); c.setLineDash([2, 10]); c.lineWidth = 30; c.strokeStyle = 'rgba(160,130,60,.6)'; c.stroke(); c.setLineDash([]); c.restore();
-  c.save(); c.translate(-12, -10); body(); c.lineWidth = 12; c.strokeStyle = 'rgba(150,240,200,.4)'; c.stroke(); c.restore();
-  c.save(); c.translate(-4, -2); body(); c.setLineDash([1, 18]); c.lineWidth = 6; c.strokeStyle = GOLD; c.stroke(); c.setLineDash([]); c.restore();
-  // jewelled collar
-  c.beginPath(); c.ellipse(hx + 112 * s, hy + 48 * s, 44 * s, 14 * s, -.6, 0, TAU); c.lineWidth = 9 * s; c.strokeStyle = INK; c.stroke(); c.lineWidth = 6 * s; c.strokeStyle = GOLD; c.stroke();
-  for (let i = 0; i < 5; i++) { const a = -.6 + Math.PI * .1 + i * .35; blob(c, hx + 112 * s + Math.cos(a + 1.2) * 42 * s * .9, hy + 48 * s + Math.sin(a + 1.2) * 14 * s, 3 * s, i % 2 ? '#d62828' : '#3fbf8f', 1); }
-  // hood, rimmed in gold, with markings
-  const hcx = hx + 105 * s, hcy = hy - 14 * s;
-  const hg = c.createRadialGradient(hcx - 20 * s, hcy - 30 * s, 10, hcx, hcy, 100 * s); hg.addColorStop(0, '#5fd3a8'); hg.addColorStop(.6, '#2aa384'); hg.addColorStop(1, '#16705a');
-  c.beginPath(); c.ellipse(hcx, hcy, 72 * s, 96 * s, -.15, 0, TAU); c.fillStyle = hg; c.fill(); c.lineWidth = 7; c.strokeStyle = GOLD; c.stroke(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
-  c.beginPath(); c.ellipse(hcx, hcy, 60 * s, 84 * s, -.15, 0, TAU); c.lineWidth = 2; c.strokeStyle = 'rgba(255,233,160,.6)'; c.stroke();
-  for (const [a, b, rx, ry] of [[-.42, -.42, 13, 17], [.42, -.42, 13, 17], [-.55, .18, 10, 13], [.55, .18, 10, 13], [0, .55, 9, 11]]) {
-    const ex0 = hcx + a * 70 * s, ey0 = hcy + b * 90 * s;
-    c.beginPath(); c.ellipse(ex0, ey0, rx * s, ry * s, 0, 0, TAU); c.fillStyle = '#fff1c0'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
-    c.beginPath(); c.ellipse(ex0, ey0, rx * s * .45, ry * s * .45, 0, 0, TAU); c.fillStyle = '#1f6f5a'; c.fill();
+  // long copper hair falling from the back of the head into the sea
+  const [hbx, hby] = up(30 * u, -100 * u);
+  const hairG = c.createLinearGradient(hbx, hby, hbx + 160 * u, SURF); hairG.addColorStop(0, '#c4693a'); hairG.addColorStop(1, '#7a3218');
+  c.beginPath(); c.moveTo(hbx - 30 * u, hby);
+  c.bezierCurveTo(hbx + 90 * u, hby - 30 * u, hbx + 130 * u + sw * 6, hby + 120 * u, hbx + 150 * u + sw * 8, SURF + 10);
+  c.lineTo(hbx + 40 * u, SURF + 10); c.bezierCurveTo(hbx + 50 * u, hby + 160 * u, hbx + 30 * u, hby + 80 * u, hbx - 10 * u, hby + 60 * u); c.closePath();
+  c.fillStyle = hairG; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  c.strokeStyle = 'rgba(255,190,140,.35)'; c.lineWidth = 2;
+  for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(hbx + i * 18 * u, hby + 8 * u); c.bezierCurveTo(hbx + (80 + i * 10) * u, hby + 20 * u, hbx + (90 + i * 12) * u + sw * 5, hby + 140 * u, hbx + (70 + i * 22) * u + sw * 7, SURF); c.stroke(); }
+  // a serpent coil arching out of the sea
+  c.beginPath(); c.moveTo(hx + 210 * u, SURF + 30); c.bezierCurveTo(hx + 210 * u, SURF - 120, hx + 380 * u, SURF - 120, hx + 380 * u, SURF + 30);
+  c.lineWidth = 60; c.strokeStyle = INK; c.stroke(); c.lineWidth = 54; c.strokeStyle = '#1f4f7a'; c.stroke();
+  c.setLineDash([3, 9]); c.lineWidth = 48; c.strokeStyle = 'rgba(120,190,230,.35)'; c.stroke(); c.setLineDash([]);
+  // neck becoming the serpent body, pale belly plates down its front
+  const neck = () => { c.beginPath(); c.moveTo(Hx - 30 * u, Hy + 30 * u); c.bezierCurveTo(Hx - 30 * u, Hy + 120 * u, Hx + 90 * u, SURF - 50, Hx + 70 * u, SURF + 40); };
+  neck(); c.lineWidth = 96 * u + 8; c.strokeStyle = INK; c.stroke(); c.lineWidth = 96 * u; c.strokeStyle = '#1f4f7a'; c.stroke();
+  c.setLineDash([4, 10]); c.lineWidth = 88 * u; c.strokeStyle = 'rgba(110,180,225,.32)'; c.stroke(); c.setLineDash([]);
+  c.save(); c.translate(-24 * u, 6 * u); neck(); c.lineWidth = 44 * u + 5; c.strokeStyle = INK; c.stroke(); c.lineWidth = 44 * u; c.strokeStyle = '#cfcbe2'; c.stroke();
+  c.setLineDash([2.5, 11]); c.lineWidth = 44 * u; c.strokeStyle = '#8e88ad'; c.stroke(); c.setLineDash([]); c.restore();
+  // lower jaw and chin (hinged)
+  const path = (pts, frame) => { c.beginPath(); pts.forEach(([x, y], i) => { const [px, py] = frame(x * u, y * u); i ? c.lineTo(px, py) : c.moveTo(px, py); }); c.closePath(); };
+  path([[-108, 0], [-116, 14], [-112, 30], [-88, 42], [-46, 52], [-4, 40], [6, 14], [0, 0]], lo);
+  const jg = c.createLinearGradient(0, Hy, 0, Hy + 60 * u); jg.addColorStop(0, SK); jg.addColorStop(1, SKD); c.fillStyle = jg; c.fill(); c.lineWidth = 3.5; c.strokeStyle = INK; c.stroke();
+  // mouth: a dark red wedge opening at the lips
+  const [ulx, uly] = up(-110 * u, 0), [llx, lly] = lo(-108 * u, 0), [tbx, tby] = up(4 * u, 6 * u), [bbx, bby] = lo(4 * u, -6 * u);
+  c.beginPath(); c.moveTo(ulx, uly); c.lineTo(tbx, tby); c.lineTo(bbx, bby); c.lineTo(llx, lly); c.closePath();
+  const mg = c.createRadialGradient(Hx, Hy, 4, Hx - 40 * u, Hy, 120 * u); mg.addColorStop(0, '#2a0812'); mg.addColorStop(1, '#9a2434'); c.fillStyle = mg; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  if (open > 30) { // forked tongue
+    const tl = Math.min(1, (open - 30) / 80), [rx, ry] = lo(-20 * u, -4 * u), tx = Math.min(ulx, llx) - 40 * u * tl, ty = Hy + 10 * u + Math.sin(t * 5) * 6 * tl;
+    c.beginPath(); c.moveTo(rx, ry); c.quadraticCurveTo((rx + tx) / 2, ry + 10 * u, tx, ty); c.lineWidth = 9 * u; c.strokeStyle = INK; c.stroke(); c.lineWidth = 6.5 * u; c.strokeStyle = '#e0506a'; c.stroke();
+    c.beginPath(); c.moveTo(tx, ty); c.lineTo(tx - 14 * u, ty - 7 * u); c.moveTo(tx, ty); c.lineTo(tx - 14 * u, ty + 6 * u); c.lineWidth = 4 * u; c.strokeStyle = '#e0506a'; c.stroke();
   }
-  // crown
-  const cx0 = hx + 95 * s, cy0 = hy - 104 * s;
-  c.beginPath(); c.moveTo(cx0 - 36 * s, cy0 + 16 * s); c.lineTo(cx0 - 28 * s, cy0 - 8 * s); c.lineTo(cx0 - 14 * s, cy0 + 6 * s); c.lineTo(cx0, cy0 - 22 * s); c.lineTo(cx0 + 14 * s, cy0 + 6 * s); c.lineTo(cx0 + 28 * s, cy0 - 8 * s); c.lineTo(cx0 + 36 * s, cy0 + 16 * s); c.closePath();
-  const crg = c.createLinearGradient(0, cy0 - 22 * s, 0, cy0 + 16 * s); crg.addColorStop(0, '#fff3b0'); crg.addColorStop(1, '#d08a10'); c.fillStyle = crg; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
-  blob(c, cx0, cy0 + 6 * s, 4.5 * s, '#d62828', 2); blob(c, cx0 - 20 * s, cy0 + 9 * s, 2.8 * s, '#3fbf8f', 1.2); blob(c, cx0 + 20 * s, cy0 + 9 * s, 2.8 * s, '#3fbf8f', 1.2);
-  // mouth interior: a glowing violet gap, never gory
-  const tipX = hx - 80 * s, hgX = hx + 62 * s;
-  const mg = c.createRadialGradient(hx, hy, 4, hx, hy, Math.max(30, open)); mg.addColorStop(0, '#b47ad8'); mg.addColorStop(.55, '#4a1f63'); mg.addColorStop(1, '#1a0b2a');
-  c.beginPath(); c.moveTo(tipX, hy - open / 2); c.lineTo(hgX, hy - 6 * s); c.lineTo(hgX, hy + 6 * s); c.lineTo(tipX + 4, hy + open / 2); c.closePath(); c.fillStyle = mg; c.fill();
-  // lower jaw with belly plates
-  c.beginPath(); c.moveTo(hgX, hy + 6 * s); c.lineTo(tipX + 4, hy + open / 2); c.quadraticCurveTo(tipX - 8 * s, hy + open / 2 + 10 * s, tipX + 14 * s, hy + open / 2 + 22 * s); c.lineTo(hx + 86 * s, hy + 40 * s); c.closePath();
-  const lg = c.createLinearGradient(0, hy, 0, hy + open / 2 + 22 * s); lg.addColorStop(0, '#f6e6b0'); lg.addColorStop(1, '#cdb36a'); c.fillStyle = lg; c.fill(); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
-  c.lineWidth = 1.5; c.strokeStyle = 'rgba(140,110,40,.6)'; for (let i = 1; i < 5; i++) { const f = i / 5, px = lerp(tipX + 14 * s, hx + 86 * s, f), py = lerp(hy + open / 2 + 20 * s, hy + 38 * s, f); c.beginPath(); c.moveTo(px, py); c.lineTo(px - 6 * s, py - 12 * s); c.stroke(); }
-  // upper jaw / head with scales and a brow ridge
-  c.beginPath(); c.moveTo(hgX, hy - 6 * s); c.lineTo(tipX, hy - open / 2); c.quadraticCurveTo(tipX - 14 * s, hy - open / 2 - 14 * s, tipX + 18 * s, hy - open / 2 - 30 * s); c.quadraticCurveTo(hx + 30 * s, hy - open / 2 - 54 * s, hx + 98 * s, hy - 44 * s); c.closePath();
-  const ug = c.createLinearGradient(0, hy - open / 2 - 54 * s, 0, hy); ug.addColorStop(0, '#4fd0a4'); ug.addColorStop(1, '#1d8a6c'); c.fillStyle = ug; c.fill(); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
-  c.strokeStyle = 'rgba(10,70,55,.5)'; c.lineWidth = 1.6;
-  for (let i = 0; i < 6; i++) { const f = i / 6, px = lerp(tipX + 30 * s, hx + 80 * s, f), py = hy - open / 2 * (1 - f * .8) - 36 * s - Math.sin(f * Math.PI) * 10 * s; c.beginPath(); c.arc(px, py, 7 * s, .2, Math.PI - .2); c.stroke(); }
-  const ex = hx + 30 * s, ey = hy - open / 2 * .55 - 28 * s;
-  c.beginPath(); c.moveTo(ex - 16 * s, ey - 10 * s); c.quadraticCurveTo(ex, ey - 18 * s, ex + 16 * s, ey - 8 * s); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
-  if (bow > .3) { c.beginPath(); c.arc(ex, ey, 9 * s, .2, Math.PI - .2); c.lineWidth = 3.5; c.strokeStyle = INK; c.stroke(); }
+  c.fillStyle = '#fbf6ea'; c.strokeStyle = INK; c.lineWidth = 1.6;
+  for (const [fx, len] of [[-96, 15], [-80, 9], [-66, 8], [-52, 7], [-38, 6]]) { path([[fx - 5, -1], [fx, len * (fx === -96 ? 1.3 : 1)], [fx + 5, -1]], up); c.fill(); c.stroke(); }
+  for (const [fx, len] of [[-92, 13], [-72, 8], [-54, 7]]) { path([[fx - 4.5, 1], [fx, -len], [fx + 4.5, 1]], lo); c.fill(); c.stroke(); }
+  // upper head in profile, tilted back as the mouth opens
+  path([[-110, 0], [-120, -8], [-124, -20], [-118, -34], [-108, -46], [-114, -60], [-106, -70], [-102, -96], [-80, -116], [-46, -124], [0, -122], [34, -110], [56, -70], [60, -24], [28, 14], [8, 10], [0, 4], [-54, -2]], up);
+  const [g0x, g0y] = up(-120 * u, -110 * u), [g1x, g1y] = up(60 * u, 0);
+  const fg = c.createLinearGradient(g0x, g0y, g1x, g1y); fg.addColorStop(0, SKL); fg.addColorStop(.45, SK); fg.addColorStop(1, SKD);
+  c.fillStyle = fg; c.fill(); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
+  const line = (pts, w, col, frame = up) => { c.beginPath(); pts.forEach(([x, y], i) => { const [px, py] = frame(x * u, y * u); i ? c.lineTo(px, py) : c.moveTo(px, py); }); c.lineWidth = w; c.strokeStyle = col; c.stroke(); };
+  line([[-110, 0], [-54, -2], [4, 6]], 4 * u, '#1a5f74');
+  line([[-100, -20], [-88, -12], [-76, -15]], 2, 'rgba(10,60,80,.6)');
+  const [nx0, ny0] = up(-116 * u, -20 * u); c.beginPath(); c.ellipse(nx0, ny0, 4.2 * u, 2.6 * u, .5 + a, 0, TAU); c.fillStyle = '#0e4a5c'; c.fill();
+  // eye and brow: fierce while testing, closed in blessing
+  const [ex, ey] = up(-80 * u, -62 * u);
+  c.save(); c.translate(ex, ey); c.rotate(a);
+  if (calm) { c.beginPath(); c.arc(0, 0, 9 * u, .25, Math.PI - .25); c.lineWidth = 3; c.strokeStyle = INK; c.stroke(); }
   else {
-    c.beginPath(); c.ellipse(ex, ey, 12 * s, 8.5 * s, -.2, 0, TAU); const eg = c.createRadialGradient(ex, ey, 1, ex, ey, 12 * s); eg.addColorStop(0, '#fff6a0'); eg.addColorStop(1, '#f0b020'); c.fillStyle = eg; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
-    c.beginPath(); c.ellipse(ex + 1, ey, 2.4 * s, 7 * s, 0, 0, TAU); c.fillStyle = INK; c.fill(); blob(c, ex - 3 * s, ey - 3 * s, 1.6 * s, '#fff', 0);
+    c.beginPath(); c.moveTo(-13 * u, 1); c.quadraticCurveTo(0, -9 * u, 12 * u, -1); c.quadraticCurveTo(0, 6 * u, -13 * u, 1); c.closePath(); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 2.4; c.strokeStyle = INK; c.stroke();
+    c.beginPath(); c.arc(-4 * u, -1 * u, 4.6 * u, 0, TAU); c.fillStyle = '#7a4418'; c.fill(); c.beginPath(); c.arc(-4.4 * u, -1 * u, 2.2 * u, 0, TAU); c.fillStyle = INK; c.fill(); blob(c, -2.6 * u, -3 * u, 1.2 * u, '#fff', 0);
   }
-  blob(c, tipX + 16 * s, hy - open / 2 - 18 * s, 2.5 * s, INK, 1);
-  blob(c, hx + 60 * s, hy - open / 2 * .4 - 46 * s, 5 * s, '#d62828', 2);
+  c.beginPath(); c.moveTo(-18 * u, -(calm ? 14 : 10) * u); c.quadraticCurveTo(-2 * u, -22 * u, 16 * u, -(calm ? 14 : 18) * u); c.lineWidth = 6 * u; c.strokeStyle = '#5a2a12'; c.stroke();
+  c.restore();
+  // ear with a gold hoop
+  const [eax, eay] = up(16 * u, -44 * u);
+  c.beginPath(); c.ellipse(eax, eay, 11 * u, 17 * u, .2 + a, 0, TAU); c.fillStyle = SK; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  const [hpx, hpy] = up(14 * u, -8 * u);
+  c.beginPath(); c.arc(hpx, hpy + 12 * u, 15 * u, 0, TAU); c.lineWidth = 6 * u + 2; c.strokeStyle = INK; c.stroke(); c.lineWidth = 6 * u; c.strokeStyle = GOLD; c.stroke();
+  // hair over the crown of the head and a golden tiara with a small cobra
+  path([[-102, -96], [-86, -128], [-30, -132], [30, -122], [60, -72], [26, -100], [-30, -110]], up);
+  c.fillStyle = '#a8552a'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  line([[-104, -92], [-60, -108], [-10, -114], [36, -104]], 9 * u + 3, INK); line([[-104, -92], [-60, -108], [-10, -114], [36, -104]], 9 * u, GOLD);
+  const [cx0, cy0] = up(-56 * u, -112 * u);
+  c.save(); c.translate(cx0, cy0); c.rotate(a);
+  c.beginPath(); c.moveTo(-14 * u, 4 * u); c.quadraticCurveTo(-18 * u, -22 * u, 0, -28 * u); c.quadraticCurveTo(18 * u, -22 * u, 14 * u, 4 * u); c.closePath();
+  const ng = c.createLinearGradient(0, -28 * u, 0, 4 * u); ng.addColorStop(0, '#fff3b0'); ng.addColorStop(1, '#d08a10'); c.fillStyle = ng; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+  blob(c, 0, -14 * u, 3 * u, '#d62828', 1.2); for (const sx of [-1, 1]) blob(c, sx * 5 * u, -20 * u, 1.4 * u, INK, 0);
+  for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * 14 * u, 2 * u); c.quadraticCurveTo(sx * 30 * u, -8 * u, sx * 40 * u, (sx < 0 ? 12 : 6) * u); c.lineWidth = 5 * u; c.strokeStyle = GOLD; c.stroke(); }
+  c.restore();
   c.restore();
 }
 const SURASA_T = [1.4, 1.9, 2.4, 2.9];
@@ -1437,7 +1461,7 @@ class SurasaLevel extends FlightLevel {
   saveExtra() { return { round: this.round }; }
   head() {
     const lk = this.lungeK, push = lk < 0 ? 0 : lk < .35 ? 30 * smooth(lk / .35) : -340 * Math.sin(Math.PI * clamp((lk - .35) / .65, 0, 1));
-    return { x: View.w - 250 + push, y: 238 + Math.sin(this.t * 1.3) * 8 + this.bow * 40, open: this.mouth * 55, s: .85 + this.mouth * .12 };
+    return { x: View.w - 250 + push, y: 262 + Math.sin(this.t * 1.3) * 8 + this.bow * 40, open: this.mouth * 55, s: .85 + this.mouth * .12 };
   }
   xRange() {
     const p = this.p, h = this.head();
@@ -1467,10 +1491,12 @@ class SurasaLevel extends FlightLevel {
     }
     this.tw += dt;
     switch (this.phase) {
-      case 'speak': if (this.tw > 2.6) { this.phase = 'round'; this.tw = 0; } break;
+      case 'speak':
+        if (this.tw > 3 && !this.saidGrow) { this.saidGrow = true; this.speak('Hanuman', 'Then I shall grow as large as your mouth!', 2.8); }
+        if (this.tw > 5.4) { this.phase = 'round'; this.tw = 0; }
+        break;
       case 'round': {
         const tg = targets[this.round]; this.mouth = lerp(this.mouth, tg, Math.min(1, dt * 2.2));
-        this.showHint('grow', 'Hold X to grow and match Surasa\'s mouth', 'Hold GROW to match Surasa\'s mouth');
         if (Math.abs(this.mouth - tg) < .08 && p.size >= tg - .25 && p.size <= tg + .45) this.match += dt; else this.match = Math.max(0, this.match - dt * .6);
         if (this.match >= 1) {
           this.addBonus(100); Sound.chord(); this.burst(p.x, p.y, 18, GOLD, 180); this.say('Hanuman matches her!', p.x, p.y - 70 * p.size, GOLD, 24);
@@ -1481,7 +1507,7 @@ class SurasaLevel extends FlightLevel {
       }
       case 'wide':
         this.mouth = lerp(this.mouth, 3.4, Math.min(1, dt * 2));
-        if (this.tw > 1.6) { this.phase = 'tiny'; this.tw = 0; this.showHint('tiny', 'Now hold Z to become tiny · dart into her mouth and back out', 'Now hold SHRINK · dart into her mouth and back out'); }
+        if (this.tw > 1.6) { this.phase = 'tiny'; this.tw = 0; this.speak('Hanuman', 'Now I become tiny, enter, and come out again. Her word will be kept!', 3.5); }
         break;
       case 'tiny': {
         const inZone = p.x > h.x - 70 * h.s && Math.abs(p.y - h.y) < h.open * .4;
@@ -1519,7 +1545,48 @@ class SurasaLevel extends FlightLevel {
     blob(c, x, o.y, 9, '#25a07f', 2.5); blob(c, x - 4, o.y - 3, 2.2, '#ffd23f', 1);
   }
   drawMid(c) { drawSurasa(c, this.head(), this.t, this.bow); }
-  drawHudExtra(c) { // size gauge: Hanuman vs Surasa's mouth
+  objective() { // the always-visible instruction for the current step
+    const k = Game.touch;
+    switch (this.phase) {
+      case 'speak': return 'Surasa blocks the way…';
+      case 'round': return `Step 1 of 3 · ${k ? 'Hold GROW' : 'Hold X'} until you match her mouth (${this.round + 1}/${SURASA_T.length})`;
+      case 'wide': return 'She opens her mouth wider than ever…';
+      case 'tiny': return this.closing ? 'Step 3 of 3 · Fly back out (←) before it closes!' : `Step 2 of 3 · ${k ? 'Hold SHRINK' : 'Hold Z'} to become tiny, then fly into her mouth (→)`;
+    }
+    return null;
+  }
+  drawFront(c) { // in-world markers around Hanuman and the mouth
+    if (this.state !== 'fly' || this.lungeK >= 0) return;
+    const p = this.p, h = this.head(), t = this.t, pulse = .6 + .4 * Math.sin(t * 6);
+    const label = (s2, col) => text(c, s2, p.sx, p.y - 34 * p.size - 26, { size: 20, align: 'center', color: col, lw: 5 });
+    const chevrons = (x0, y0, x1, dir) => { c.fillStyle = `rgba(255,200,61,${pulse})`; c.strokeStyle = INK; c.lineWidth = 2; for (let x = x0; dir > 0 ? x < x1 : x > x1; x += dir * 34) { const ox = x + dir * ((t * 60) % 34); c.beginPath(); c.moveTo(ox, y0 - 10); c.lineTo(ox + dir * 12, y0); c.lineTo(ox, y0 + 10); c.lineTo(ox + dir * 4, y0); c.closePath(); c.fill(); c.stroke(); } };
+    if (this.phase === 'round') {
+      const tg = SURASA_T[this.round], rT = 24 * tg, rP = 24 * p.size;
+      c.save(); c.setLineDash([7, 6]); c.beginPath(); c.arc(p.sx, p.y, rT, 0, TAU); c.lineWidth = 3; c.strokeStyle = `rgba(90,230,200,${.6 + .4 * pulse})`; c.stroke(); c.restore();
+      c.beginPath(); c.arc(p.sx, p.y, rP, 0, TAU); c.lineWidth = 2; c.strokeStyle = 'rgba(255,244,220,.6)'; c.stroke();
+      if (this.match > 0) { c.beginPath(); c.arc(p.sx, p.y, rT + 7, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, this.match)); c.lineWidth = 6; c.strokeStyle = GOLD; c.stroke(); }
+      if (p.size < tg - .25) label('Grow ▲', '#9af0d8'); else if (p.size > tg + .45) label('Too big ▼', '#ffb3b3'); else label('Hold it…', GOLD);
+    } else if (this.phase === 'tiny') {
+      const mx = h.x - 20 * h.s, my = h.y;
+      if (!this.closing) {
+        c.beginPath(); c.arc(mx, my, 18 + 6 * pulse, 0, TAU); c.lineWidth = 3; c.strokeStyle = `rgba(255,220,120,${pulse})`; c.stroke();
+        if (p.size > .65) label(Game.touch ? 'Hold SHRINK ▼' : 'Hold Z ▼', '#9af0d8');
+        else { chevrons(p.sx + 30, p.y, mx - 30, 1); if (Math.abs(p.y - my) > h.open * .3) label(p.y < my ? 'Lower ▼' : 'Higher ▲', '#9af0d8'); }
+      } else { chevrons(p.sx - 30, p.y, Math.max(40, p.sx - 200), -1); label('Out! ←', GOLD); }
+    }
+  }
+  drawHudExtra(c) { // step panel, impatience bar, and the size gauge
+    const obj = this.objective();
+    if (obj && this.state === 'fly') {
+      c.font = `700 18px ${UIF}`; const w = Math.min(View.w - 40, c.measureText(obj).width + 40), y0 = View.safe.t + 40;
+      rr(c, View.w / 2 - w / 2, y0, w, 32, 16); c.fillStyle = 'rgba(255,244,220,.95)'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+      text(c, obj, View.w / 2, y0 + 17, { size: 18, w: 700, align: 'center', stroke: false, color: INK });
+      if (this.phase === 'round' && this.lungeK < 0) {
+        const bw = 160, k = Math.min(1, this.tw / 12); rr(c, View.w / 2 - bw / 2, y0 + 38, bw, 8, 4); c.fillStyle = 'rgba(20,10,40,.5)'; c.fill();
+        if (k > 0) { rr(c, View.w / 2 - bw / 2, y0 + 38, bw * k, 8, 4); c.fillStyle = k > .7 ? '#ff6b6b' : '#ffb347'; c.fill(); }
+        text(c, 'patience', View.w / 2 + bw / 2 + 8, y0 + 42, { size: 12, lw: 3 });
+      }
+    }
     if (this.phase !== 'round' && this.phase !== 'tiny' && this.phase !== 'wide') return;
     const L = View.safe.l + 14, y = View.safe.t + 90, w = 176, x0 = L + 26, f = v => x0 + (clamp(v, .35, 3.4) - .35) / 3.05 * w;
     text(c, 'Size', L - 2, y + 7, { size: 13, lw: 3 });
