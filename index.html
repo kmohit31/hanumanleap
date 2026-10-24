@@ -356,7 +356,7 @@ function limb(c, p, w, col) {
 }
 function blob(c, x, y, r, fill, lw = 2.5) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fillStyle = fill; c.fill(); c.lineWidth = lw; c.strokeStyle = INK; c.stroke(); }
 function drawHanuman(c, x, y, s, ang, t, o = {}) {
-  c.save(); c.translate(x, y); c.rotate(ang); c.scale(s, s); c.lineCap = 'round'; c.lineJoin = 'round';
+  c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); c.rotate(ang); c.scale(s, s); c.lineCap = 'round'; c.lineJoin = 'round';
   if (o.glow) {
     const g = c.createRadialGradient(0, -6, 10, 0, -6, 80); g.addColorStop(0, 'rgba(255,240,160,.85)'); g.addColorStop(.5, 'rgba(255,200,61,.4)'); g.addColorStop(1, 'rgba(255,170,40,0)');
     c.fillStyle = g; c.beginPath(); c.arc(0, -6, 80, 0, TAU); c.fill();
@@ -402,6 +402,11 @@ function drawHanuman(c, x, y, s, ang, t, o = {}) {
   blob(c, 34, -27.5, 2.2, '#d62828', 1.4);
   // arm reaching forward
   limb(c, [[18, -6], [32, -1], [50, -6]], 7, FUR); blob(c, 52, -6, 5.2, FUR, 2.5);
+  if (o.ring) { // Rama's mudrika held out
+    const rg = c.createRadialGradient(57, -11, 1, 57, -11, 22); rg.addColorStop(0, 'rgba(255,240,170,.9)'); rg.addColorStop(1, 'rgba(255,200,61,0)');
+    c.fillStyle = rg; c.beginPath(); c.arc(57, -11, 22, 0, TAU); c.fill();
+    c.beginPath(); c.arc(57, -11, 5, 0, TAU); c.lineWidth = 3; c.strokeStyle = GOLD; c.stroke(); blob(c, 57, -16.5, 2, '#d62828', 1);
+  }
   c.restore();
 }
 function drawLotus(c, x, y, s = 1) {
@@ -604,7 +609,7 @@ class FlightLevel extends Level {
     this.objs = this.gen(); this.nextId = 100000;
     this.lotusTotal = this.objs.filter(o => o.type === 'lotus').length;
     const c1 = this.objs.find(o => o.type === 'cp'); this.cpX = c1 ? c1.x : null;
-    this.p = { x: 220, y: 230, py: 230, vy: 0, sx: 220, size: 1, cs: 1, idx: 1, cur: 1, energy: 100, inv: 0, glow: 0, ang: 0, t: 0, landed: null };
+    this.p = { x: 220, y: 230, py: 230, vy: 0, sx: 220, size: 1, cs: 1, idx: 1, cur: 1, energy: 100, inv: 0, glow: 0, ang: 0, t: 0, landed: null, face: 1 };
     this.camX = 0; this.state = 'ready'; this.cp = null; this.speedMul = 1;
     this.startPose(this.p);
     if (cp) {
@@ -659,11 +664,18 @@ class FlightLevel extends Level {
     if (Input.take('glow') && this.dev >= 100) { this.dev = 0; p.glow = 3; Sound.chord(); this.say('Golden glow!', p.x, p.y - 50, GOLD, 26); }
     p.inv = Math.max(0, p.inv - dt); p.glow = Math.max(0, p.glow - dt);
     // flight
-    p.py = p.y;
+    p.py = p.y; p.onGround = false;
+    if (!Input.held.fly) p.jumpLock = false;
     const r = 16 * p.size;
     if (p.landed) {
       p.vy = 0; p.energy = Math.min(100, p.energy + 35 * dt);
-      if (Input.held.fly) { p.landed = null; p.vy = -330; Sound.whoosh(true); }
+      if (Input.held.fly && !p.jumpLock) { p.landed = null; p.vy = this.jump ? -this.jumpV : -330; p.jumpLock = true; Sound.whoosh(true); }
+    } else if (this.jump) { // platformer: jump from the ground, hold to float
+      const hold = Input.held.fly;
+      if (p.wasGround && hold && !p.jumpLock) { p.vy = -this.jumpV; p.jumpLock = true; Sound.whoosh(true); }
+      p.vy += (hold && p.vy > -120 ? 480 : 1300) * dt;
+      p.vy = clamp(p.vy, -700, hold ? 170 : 600); p.y += p.vy * dt;
+      if (p.y < 44 + r) { p.y = 44 + r; p.vy = Math.max(p.vy, 0); }
     } else {
       const hold = Input.held.fly, dive = Input.held.dive && !hold;
       if (hold) { p.vy -= 1750 * th * (p.energy > 0 ? 1 : this.lowThrust) * dt; p.energy -= this.drainHold * dr * dt; }
@@ -676,15 +688,25 @@ class FlightLevel extends Level {
       const top = 44 + r;
       if (p.y < top) { p.y = top; if (p.vy < 0) p.vy = 0; }
     }
-    const [x0, x1] = this.xRange(), mv = p.landed ? 0 : (Input.held.right ? 1 : 0) - (Input.held.left ? 1 : 0);
-    p.sx = clamp(p.sx + mv * 280 * dt, x0, Math.max(x0, x1));
-    if (!p.landed) this.camX += this.speed(x1 > x0 ? (p.sx - x0) / (x1 - x0) : 0) * this.speedMul * dt;
+    const [x0, x1] = this.xRange(), mv = p.landed && !this.walk ? 0 : (Input.held.right ? 1 : 0) - (Input.held.left ? 1 : 0);
+    if (mv) p.face = mv;
+    if (this.walk) { // free movement through the world, camera follows
+      p.x = clamp(p.x + mv * [190, 230, 200][p.cur] * this.speedMul * dt, 40, this.len + 150);
+      this.camX = clamp(p.x - View.w * .4, 0, Math.max(0, this.len + 200 - View.w)); p.sx = p.x - this.camX;
+    } else {
+      p.sx = clamp(p.sx + mv * 280 * dt, x0, Math.max(x0, x1));
+      if (!p.landed) this.camX += this.speed(x1 > x0 ? (p.sx - x0) / (x1 - x0) : 0) * this.speedMul * dt;
+      p.x = this.camX + p.sx;
+    }
     this.speedMul = 1;
-    p.x = this.camX + p.sx;
-    p.ang = lerp(p.ang, p.landed ? -.15 : clamp(p.vy / 900, -.35, .4), Math.min(1, dt * 8));
+    p.ang = lerp(p.ang, p.landed ? -.15 : this.jump ? clamp(p.vy / 1400, -.25, .25) : clamp(p.vy / 900, -.35, .4), Math.min(1, dt * 8));
+    if (this.floorY != null) { // solid ground
+      if (p.y + r >= this.floorY) { p.y = this.floorY - r; if (p.vy > 0) p.vy = 0; p.onGround = true; }
+    }
+    p.wasGround = p.onGround || !!p.landed;
     // the sea
     const sy = surfY(p.x, this.t);
-    if (!p.landed && p.y + r > sy) {
+    if (this.floorY == null && !p.landed && p.y + r > sy) {
       if (!p.glow) this.hurt();
       p.y = sy - r; p.vy = -480; this.burst(p.x, sy, 16, '#cfefff', 220); Sound.whoosh(true);
     }
@@ -815,18 +837,20 @@ class FlightLevel extends Level {
     this.drawFront(c, camX);
     this.drawFx(c, camX);
     c.restore();
-    if (this.state === 'ready') {
-      const a = .75 + .25 * Math.sin(t * 4), cxT = this.titleX ? this.titleX() : W / 2 + 60;
-      if (!this.cp) {
-        text(c, this.name, cxT, 190, { size: 50, font: TF, w: 400, align: 'center', color: GOLD, lw: 7 });
-        text(c, this.def.sub, cxT, 236, { size: 20, align: 'center', w: 700 });
-      }
-      c.globalAlpha = a;
-      text(c, Game.touch ? 'Hold FLY to begin' : 'Hold SPACE or click to begin', cxT, 290, { size: 26, align: 'center' });
-      c.globalAlpha = 1;
-    }
+    this.drawReady(c);
     this.drawHud(c, this.progress(), this.cpFrac());
     this.drawHudExtra(c);
+  }
+  drawReady(c) {
+    if (this.state !== 'ready') return;
+    const a = .75 + .25 * Math.sin(this.t * 4), cxT = this.titleX ? this.titleX() : View.w / 2 + 60;
+    if (!this.cp) {
+      text(c, this.name, cxT, 190, { size: 50, font: TF, w: 400, align: 'center', color: GOLD, lw: 7 });
+      text(c, this.def.sub, cxT, 236, { size: 20, align: 'center', w: 700 });
+    }
+    c.globalAlpha = a;
+    text(c, Game.touch ? 'Hold FLY to begin' : 'Hold SPACE or click to begin', cxT, 290, { size: 26, align: 'center' });
+    c.globalAlpha = 1;
   }
   drawShadow(c) {
     const p = this.p, shA = clamp(1 - (SURF - p.y) / 380, .1, .5);
@@ -1322,15 +1346,518 @@ class SimhikaLevel extends FlightLevel {
   }
 }
 
+// ---------- Ground engine (levels 5–7): solid floor, Lanka by night ----------
+const LANKA_FAR = Array.from({ length: 16 }, (_, i) => ({ x: i * 140 + (i * 53 % 60), w: 50 + (i * 37 % 50), h: 110 + (i * 71 % 150) }));
+const LANKA_MID = Array.from({ length: 11 }, (_, i) => ({ x: i * 230 + (i * 41 % 90), w: 80 + (i * 29 % 70), h: 80 + (i * 61 % 120) }));
+function drawTower(c, x, base, w, h, body, trim, lit, t, seed) {
+  c.fillStyle = body; c.fillRect(x, base - h, w, h);
+  c.beginPath(); c.arc(x + w / 2, base - h, w * .42, Math.PI, 0); c.fill();
+  c.strokeStyle = trim; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(x, base - h); c.lineTo(x + w, base - h); c.moveTo(x + w / 2, base - h - w * .42); c.lineTo(x + w / 2, base - h - w * .42 - 14); c.stroke();
+  if (lit) for (let r = 0; r < 4; r++) for (let k = 0; k < 2; k++) {
+    if ((r + k + seed) % 3 === 0) continue;
+    c.fillStyle = `rgba(255,205,110,${.5 + .3 * Math.sin(t * 2 + seed + r * 2 + k)})`;
+    c.fillRect(x + w * (.25 + k * .38), base - h + 18 + r * 26, 6, 10);
+  }
+}
+function drawNightSky(c, t, floorY) {
+  const W = View.w, g = c.createLinearGradient(0, 0, 0, floorY);
+  g.addColorStop(0, '#0a0726'); g.addColorStop(.6, '#1d1450'); g.addColorStop(1, '#3d2a6e');
+  c.fillStyle = g; c.fillRect(-20, -20, W + 40, floorY + 40);
+  for (const s of STARS) { if (s.x > W + 20) continue; c.globalAlpha = .45 + .45 * Math.sin(t * 2 + s.ph); c.fillStyle = '#fff'; c.beginPath(); c.arc(s.x, s.y * .75, s.r, 0, TAU); c.fill(); }
+  c.globalAlpha = 1;
+  const mx = W * .82, mg = c.createRadialGradient(mx, 86, 10, mx, 86, 160); mg.addColorStop(0, 'rgba(230,230,255,.6)'); mg.addColorStop(1, 'rgba(230,230,255,0)');
+  c.fillStyle = mg; c.fillRect(mx - 160, -74, 320, 320); blob(c, mx, 86, 30, '#f4f0d4', 0);
+}
+function drawLankaNight(c, camX, t, floorY) {
+  const W = View.w;
+  drawNightSky(c, t, floorY);
+  for (const T of LANKA_FAR) { const x = ((T.x - camX * .12) % 2240 + 2240) % 2240 - 120; if (x < W + 60) drawTower(c, x, floorY - 30, T.w, T.h, '#241a52', 'rgba(217,165,58,.45)', false, t, 0); }
+  for (const [i, T] of LANKA_MID.entries()) { const x = ((T.x - camX * .35) % 2530 + 2530) % 2530 - 160; if (x < W + 60) drawTower(c, x, floorY - 6, T.w, T.h, '#5e4420', '#e0b04a', true, t, i); }
+  const g = c.createLinearGradient(0, floorY, 0, VH); g.addColorStop(0, '#3a2f5a'); g.addColorStop(1, '#17112c');
+  c.fillStyle = g; c.fillRect(-20, floorY, W + 40, VH - floorY + 20);
+  c.strokeStyle = 'rgba(255,220,150,.12)'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, floorY + 1); c.lineTo(W, floorY + 1);
+  for (let x = -((camX % 64) + 64) % 64; x < W; x += 64) { c.moveTo(x, floorY); c.lineTo(x - 18, VH); }
+  c.stroke();
+}
+function drawTorch(c, x, y, t) {
+  const g = c.createRadialGradient(x, y - 14, 2, x, y - 14, 70); g.addColorStop(0, 'rgba(255,190,90,.55)'); g.addColorStop(1, 'rgba(255,170,60,0)');
+  c.fillStyle = g; c.fillRect(x - 70, y - 84, 140, 140);
+  c.fillStyle = '#6b4a2a'; c.fillRect(x - 3, y - 4, 6, 26);
+  const f = 1 + Math.sin(t * 13 + x) * .12;
+  c.beginPath(); c.moveTo(x, y - 26 * f); c.quadraticCurveTo(x + 10, y - 8, x, y); c.quadraticCurveTo(x - 10, y - 8, x, y - 26 * f); c.fillStyle = '#ffb020'; c.fill();
+  c.beginPath(); c.moveTo(x, y - 15 * f); c.quadraticCurveTo(x + 4, y - 5, x, y - 1); c.quadraticCurveTo(x - 4, y - 5, x, y - 15 * f); c.fillStyle = '#fff3b0'; c.fill();
+}
+function drawRakshasa(c, x, fy, dir, t, o = {}) { // a stylised palace guard with a spear
+  c.save(); c.translate(x, fy); c.scale(dir, 1); c.lineJoin = 'round'; c.lineCap = 'round';
+  const step = o.walk ? Math.sin(t * 8) * 4 : 0;
+  c.strokeStyle = INK; c.lineWidth = 9; c.beginPath(); c.moveTo(-8, -34); c.lineTo(-10 - step, 0); c.moveTo(8, -34); c.lineTo(10 + step, 0); c.stroke();
+  c.strokeStyle = '#3f7a52'; c.lineWidth = 5; c.stroke();
+  c.beginPath(); c.moveTo(-16, -30); c.lineTo(16, -30); c.lineTo(12, -46); c.lineTo(-12, -46); c.closePath(); c.fillStyle = '#8a2a2a'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.ellipse(0, -60, 15, 18, 0, 0, TAU); c.fillStyle = '#3f7a52'; c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(-10, -66); c.lineTo(10, -66); c.lineTo(8, -60); c.lineTo(-8, -60); c.fillStyle = '#d9a53a'; c.fill();
+  blob(c, 0, -80, 11, '#3f7a52', 2.5);
+  c.beginPath(); c.moveTo(-11, -84); c.quadraticCurveTo(0, -98, 11, -84); c.closePath(); c.fillStyle = '#d9a53a'; c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(-7, -88); c.lineTo(-11, -97); c.moveTo(7, -88); c.lineTo(11, -97); c.lineWidth = 3; c.strokeStyle = '#e8e0c8'; c.stroke();
+  c.fillStyle = o.alert ? '#ff6b6b' : '#ffd23f'; c.beginPath(); c.arc(6, -81, 2.4, 0, TAU); c.fill();
+  c.strokeStyle = '#6b4a2a'; c.lineWidth = 3; c.beginPath(); c.moveTo(14, 0); c.lineTo(14, -110); c.stroke();
+  c.beginPath(); c.moveTo(14, -122); c.lineTo(19, -108); c.lineTo(9, -108); c.closePath(); c.fillStyle = '#c9c9d6'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  blob(c, 14, -58, 4.5, '#3f7a52', 2);
+  c.restore();
+  if (o.seeing) text(c, '!', x, fy - 128, { size: 26, color: o.alert ? '#ff6b6b' : '#ffd23f', align: 'center' });
+}
+class GroundLevel extends FlightLevel {
+  drawScene(c, camX) {}
+  shadowY() { return this.p.landed ? this.p.landed.top + 3 : this.floorY + 3; }
+  heroOpts() { return { glow: this.p.glow > 0, flip: this.p.face < 0 }; }
+  draw(c) {
+    const p = this.p, t = this.t, W = View.w, camX = this.camX, sh = this.shake > 0 ? this.shake * 14 : 0;
+    c.save(); if (sh) c.translate((Math.random() - .5) * sh, (Math.random() - .5) * sh);
+    this.drawScene(c, camX);
+    const L = camX - 300, R = camX + W + 300, vis = o => !o.dead && o.x > L - 600 && o.x < R;
+    for (const o of this.objs) if (vis(o)) { if (o.type === 'cp') this.drawGroundCp(c, o.x - camX); else this.objDraw(c, o, o.x - camX, 'back'); }
+    const shy = this.shadowY();
+    c.beginPath(); c.ellipse(p.sx, shy, 26 * p.size, 5 * p.size, 0, 0, TAU); c.fillStyle = `rgba(0,0,0,${clamp(.4 - (shy - p.y) / 900, .1, .4)})`; c.fill();
+    for (const o of this.objs) if (vis(o)) this.objDraw(c, o, o.x - camX, 'mid');
+    this.drawMid(c, camX);
+    for (const o of this.objs) {
+      if (o.dead || o.x < L || o.x > R) continue;
+      if (o.type === 'lotus') drawLotus(c, o.x - camX, o.y + Math.sin(t * 2 + o.ph) * 5);
+      else if (o.type === 'orb') drawOrb(c, o.x - camX, o.y + Math.sin(t * 2 + o.ph) * 6, t);
+    }
+    if (!(p.inv > 0 && p.inv < 50 && Math.sin(t * 30) > .3) || this.state !== 'fly') drawHanuman(c, p.sx, p.y, p.size, p.ang, t, this.heroOpts());
+    for (const o of this.objs) if (vis(o)) this.objDraw(c, o, o.x - camX, 'front');
+    this.drawFront(c, camX);
+    this.drawFx(c, camX);
+    c.restore();
+    this.drawReady(c);
+    this.drawHud(c, this.progress(), this.cpFrac());
+    this.drawHudExtra(c);
+  }
+  drawGroundCp(c, x) {
+    const y = this.floorY, bg = c.createLinearGradient(0, 80, 0, y); bg.addColorStop(0, 'rgba(255,220,120,0)'); bg.addColorStop(1, 'rgba(255,220,120,.35)');
+    c.fillStyle = bg; c.fillRect(x - 12, 80, 24, y - 80); drawFlame(c, x, y - 8, 1.5 + Math.sin(this.t * 9) * .05, true);
+  }
+}
+
+// ---------- Level 5: Lankini at the gate ----------
+function drawLankini(c, x, fy, t, st) {
+  const k = st.kneel || 0, up = k * 70;
+  c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+  const SK = '#6a58b0', HAIR = '#e0552b';
+  // legs, set wide (the gap between her feet is the way through)
+  const fw = st.closed ? 20 : 50;
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(x + s * 20, fy - 118 + up); c.quadraticCurveTo(x + s * (fw + 2), fy - 60 + up * .5, x + s * fw, fy); c.lineWidth = 30; c.strokeStyle = INK; c.stroke(); c.lineWidth = 24; c.strokeStyle = SK; c.stroke(); c.beginPath(); c.ellipse(x + s * fw, fy - 8, 13, 5, 0, 0, TAU); c.fillStyle = GOLD; c.fill(); }
+  c.beginPath(); c.moveTo(x - 44, fy - 150 + up); c.lineTo(x + 44, fy - 150 + up); c.lineTo(x + 58, fy - 100 + up); c.lineTo(x - 58, fy - 100 + up); c.closePath(); c.fillStyle = '#b8322a'; c.fill(); c.lineWidth = 3.5; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(x - 44, fy - 140 + up); c.lineTo(x + 44, fy - 140 + up); c.lineWidth = 5; c.strokeStyle = GOLD; c.stroke();
+  // torso and armour
+  c.beginPath(); c.ellipse(x, fy - 186 + up, 42, 46, 0, 0, TAU); c.fillStyle = SK; c.fill(); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(x - 34, fy - 206 + up); c.quadraticCurveTo(x, fy - 186 + up, x + 34, fy - 206 + up); c.lineTo(x + 30, fy - 160 + up); c.quadraticCurveTo(x, fy - 148 + up, x - 30, fy - 160 + up); c.closePath(); c.fillStyle = '#d9a53a'; c.fill(); c.lineWidth = 3; c.stroke();
+  if (st.guard) { const a = .5 + .5 * Math.sin(t * 8); const g = c.createRadialGradient(x - 10, fy - 182 + up, 2, x - 10, fy - 182 + up, 40); g.addColorStop(0, `rgba(255,245,180,${.9 * a})`); g.addColorStop(1, 'rgba(255,200,61,0)'); c.fillStyle = g; c.beginPath(); c.arc(x - 10, fy - 182 + up, 40, 0, TAU); c.fill(); }
+  // free arm on the hip
+  c.beginPath(); c.moveTo(x + 34, fy - 200 + up); c.quadraticCurveTo(x + 66, fy - 176 + up, x + 44, fy - 150 + up); c.lineWidth = 20; c.strokeStyle = INK; c.stroke(); c.lineWidth = 14; c.strokeStyle = SK; c.stroke();
+  // head and wild hair
+  const hx = x - 4, hy = fy - 252 + up * 1.1;
+  c.fillStyle = HAIR; c.strokeStyle = INK; c.lineWidth = 3; c.beginPath();
+  for (let i = 0; i <= 10; i++) { const a = Math.PI * .85 + i / 10 * Math.PI * 1.3, r = i % 2 ? 34 : 50 + Math.sin(t * 5 + i) * 3; const px = hx + Math.cos(a) * r, py = hy + Math.sin(a) * r; i ? c.lineTo(px, py) : c.moveTo(px, py); }
+  c.closePath(); c.fill(); c.stroke();
+  blob(c, hx, hy, 30, SK, 4);
+  c.beginPath(); c.moveTo(hx - 26, hy - 18); c.lineTo(hx + 26, hy - 18); c.lineTo(hx + 22, hy - 28); c.lineTo(hx + 8, hy - 24); c.lineTo(hx, hy - 38); c.lineTo(hx - 8, hy - 24); c.lineTo(hx - 22, hy - 28); c.closePath(); c.fillStyle = GOLD; c.fill(); c.lineWidth = 2.5; c.stroke();
+  const calm = k > .5;
+  c.lineWidth = 3.5; c.beginPath();
+  if (calm) { c.moveTo(hx - 20, hy - 8); c.lineTo(hx - 6, hy - 8); c.moveTo(hx + 6, hy - 8); c.lineTo(hx + 20, hy - 8); }
+  else { c.moveTo(hx - 22, hy - 12); c.lineTo(hx - 6, hy - 6); c.moveTo(hx + 22, hy - 12); c.lineTo(hx + 6, hy - 6); }
+  c.stroke();
+  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(hx + s * 12, hy, 6, calm ? 1.5 : 4.5, 0, 0, TAU); c.fillStyle = calm ? INK : '#ffd23f'; c.fill(); }
+  c.beginPath(); c.moveTo(hx - 12, hy + 16); c.quadraticCurveTo(hx, hy + (calm ? 20 : 12), hx + 12, hy + 16); c.lineWidth = 3; c.stroke();
+  if (!calm) { c.fillStyle = '#fff'; c.beginPath(); c.moveTo(hx - 9, hy + 14); c.lineTo(hx - 7, hy + 21); c.lineTo(hx - 4, hy + 14); c.moveTo(hx + 9, hy + 14); c.lineTo(hx + 7, hy + 21); c.lineTo(hx + 4, hy + 14); c.fill(); }
+  c.lineWidth = 3; c.strokeStyle = GOLD; for (const s of [-1, 1]) { c.beginPath(); c.arc(hx + s * 30, hy + 10, 6, 0, TAU); c.stroke(); }
+  // club arm and iron club
+  const sxp = x - 32, syp = fy - 204 + up, a = st.club, hdx = sxp + Math.cos(a) * 40, hdy = syp + Math.sin(a) * 40;
+  c.beginPath(); c.moveTo(sxp, syp); c.lineTo(hdx, hdy); c.lineWidth = 22; c.strokeStyle = INK; c.stroke(); c.lineWidth = 16; c.strokeStyle = SK; c.stroke();
+  const ex = hdx + Math.cos(a) * 150, ey = hdy + Math.sin(a) * 150;
+  c.beginPath(); c.moveTo(hdx, hdy); c.lineTo(ex, ey); c.lineWidth = 12; c.strokeStyle = INK; c.stroke(); c.lineWidth = 7; c.strokeStyle = '#5a5a6e'; c.stroke();
+  blob(c, ex, ey, 20, '#4a4a5e', 3.5); c.beginPath(); c.arc(ex, ey, 20, 0, TAU); c.lineWidth = 3; c.strokeStyle = '#d9a53a'; c.setLineDash([5, 6]); c.stroke(); c.setLineDash([]);
+  blob(c, hdx, hdy, 9, SK, 3);
+  if (st.flash > 0) { c.globalAlpha = Math.min(1, st.flash * 2); c.beginPath(); c.ellipse(x, fy - 170 + up, 70, 110, 0, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.globalAlpha = 1; }
+  c.restore();
+  return { ex, ey };
+}
+function drawGate(c, gx, fy, t, open) {
+  c.save(); c.lineJoin = 'round';
+  const g = c.createLinearGradient(gx, 0, gx + 220, 0); g.addColorStop(0, '#f0c25a'); g.addColorStop(1, '#a8741c');
+  c.fillStyle = g; c.strokeStyle = INK; c.lineWidth = 4;
+  c.beginPath(); c.moveTo(gx, fy); c.lineTo(gx, fy - 300); c.quadraticCurveTo(gx + 110, fy - 420, gx + 260, fy - 300); c.lineTo(gx + 260, fy); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(gx + 40, fy); c.lineTo(gx + 40, fy - 250); c.quadraticCurveTo(gx + 130, fy - 340, gx + 220, fy - 250); c.lineTo(gx + 220, fy); c.closePath();
+  c.fillStyle = open ? '#ffe9a8' : '#3a2410'; c.fill(); c.stroke();
+  if (!open) { c.strokeStyle = '#d9a53a'; c.lineWidth = 3; c.beginPath(); c.moveTo(gx + 130, fy - 300); c.lineTo(gx + 130, fy); for (let y = fy - 220; y < fy; y += 50) { c.moveTo(gx + 44, y); c.lineTo(gx + 216, y); } c.stroke(); }
+  for (const dx of [12, 248]) { c.fillStyle = '#c99434'; c.fillRect(gx + dx - 10, fy - 360, 20, 60); c.beginPath(); c.arc(gx + dx, fy - 360, 14, Math.PI, 0); c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke(); }
+  drawTorch(c, gx - 14, fy - 200, t); drawTorch(c, gx + 274, fy - 200, t);
+  c.restore();
+}
+class LankiniLevel extends GroundLevel {
+  config() { return { scroll: false, floorY: 470, par: 70, len: 1, bonusLabel: 'Victory at the gate', drainHold: 1.6, drainGlide: .3 }; }
+  startPose(p) { p.sx = 150; p.y = 300; }
+  titleX() { return View.w * .4; }
+  lx() { return View.w - 250; }
+  onReset(cp) {
+    this.ph = 'idle'; this.pt = 0; this.atk = 0; this.club = -.9; this.bandY = 0; this.waves = []; this.rocks = []; this.kneel = 0; this.won = null; this.wonT = 0; this.firstGuard = true; this.flash = 0; this.drumT = 0; this.pushT = 0;
+    if (cp && cp.extra) { this.atk = cp.extra.atk; this.firstGuard = false; this.ph = 'guard'; }
+  }
+  saveExtra() { return { atk: this.atk }; }
+  onLeap() { this.showHint('dodge', 'Dodge Lankini\'s attacks and watch for an opening', 'Dodge Lankini\'s attacks and watch for an opening'); this.speak('Lankini', 'Who dares approach the gate of Lanka by night? Turn back, little monkey!', 3.5); }
+  xRange() {
+    const p = this.p, lx = this.lx();
+    if (this.won) return [60, View.w - 60];
+    if (p.cur === 0 && p.y > this.floorY - 62 && this.gapOpen()) return [60, View.w - 40];
+    return [60, lx - (this.ph === 'guard' ? 60 : 100) - 18 * p.size];
+  }
+  gapOpen() { return this.ph === 'guard' || (this.ph === 'slam' && this.pt > .8 && this.atk >= 3); } // her feet part only after a slam or when winded
+  progress() { return this.won ? 1 : clamp(this.atk / 9, 0, .95); }
+  cpFrac() { return 1 / 3; }
+  finished() { return this.won && this.wonT > 4.5; }
+  goal2() { return { label: 'Pass the gate within 1:10', ok: this.time <= 70 }; }
+  idle(dt) { if (this.won) { this.wonT += dt; this.kneel = lerp(this.kneel, this.won === 'blow' ? 1 : 0, dt * 2); this.club = lerp(this.club, 1.2, dt * 2); } }
+  nextAttack() {
+    this.atk++; this.pt = 0;
+    if (this.atk % 3 === 0) {
+      this.ph = 'guard';
+      if (this.firstGuard) { this.firstGuard = false; this.showHint('blow', 'Her guard is open! Grow mighty (X) and strike her', 'Her guard is open! GROW mighty and strike her'); this.checkpoint(0); }
+    } else this.ph = 'idle';
+  }
+  levelUpdate(dt) {
+    const p = this.p, lx = this.lx(), F = this.floorY, r = 16 * p.size;
+    this.flash = Math.max(0, this.flash - dt); this.pushT -= dt;
+    if (this.won) { this.idle(dt); return; }
+    if ((this.drumT -= dt) <= 0) { this.drumT = 1.1; Sound.drum(.3); }
+    if (p.cur === 0 && p.x > lx + 50) { // slipped between her feet
+      this.won = 'slip'; this.wonT = 0; this.addBonus(300); Sound.chord(); p.inv = 99;
+      this.speak('Hanuman', 'Small as a cat, I slip into Lanka unseen. Jai Shri Ram!', 4); return;
+    }
+    if (this.atk === 4 && this.ph === 'idle') this.showHint('slip', 'Or shrink tiny (Z) and slip between her feet after a slam', 'Or SHRINK tiny and slip between her feet after a slam');
+    if (!this.gapOpen() && p.x > lx - 70 && p.x < lx + 50) { p.sx = lx - 80 - 18 * p.size; p.x = p.sx; if (this.pushT <= 0) { this.pushT = 1; this.say('Her feet close!', p.x, p.y - 40, '#ffd0d0', 20); } }
+    this.pt += dt;
+    const hand = { x: lx - 70, y: F - 200 };
+    switch (this.ph) {
+      case 'idle':
+        this.club = lerp(this.club, -.9, dt * 4);
+        if (this.pt > 1.1) { this.ph = ['sweep', 'slam', 'rocks'][this.atk % 3]; this.pt = 0; this.bandY = [F - 40, 330, 205][(Math.random() * 3) | 0]; this.hitDone = false; }
+        break;
+      case 'sweep':
+        if (this.pt < .9) this.club = lerp(this.club, -2.4, dt * 5);
+        else if (this.pt < 1.25) { this.club = lerp(this.club, Math.PI, dt * 14); if (Math.abs(p.y - this.bandY) < 26 + r && p.x < lx - 30 && this.hurt()) p.vy = this.bandY > 300 ? -420 : 300; }
+        if (this.pt > 1.7) this.nextAttack();
+        break;
+      case 'slam':
+        if (this.pt < .8) this.club = lerp(this.club, -1.9, dt * 5);
+        else this.club = lerp(this.club, 1.35, dt * 16);
+        if (this.pt > .8 && !this.hitDone) { this.hitDone = true; this.waves.push({ x: lx - 120, v: -440 }); this.shake = .25; Sound.drum(.8); }
+        if (this.pt > 1.4 && this.waves.length < 2 && this.hitDone !== 2) { this.hitDone = 2; this.waves.push({ x: lx - 120, v: -440 }); Sound.drum(.6); }
+        if (this.pt > 2.5) this.nextAttack();
+        break;
+      case 'rocks':
+        this.club = lerp(this.club, -.4, dt * 4);
+        for (const tt of [.5, 1.0, 1.5]) if (this.pt - dt < tt && this.pt >= tt) { const T = 1.1, g = 600; this.rocks.push({ x: hand.x, y: hand.y, vx: (p.x - hand.x) / T, vy: (p.y - hand.y) / T - .5 * g * T }); Sound.whoosh(false); }
+        if (this.pt > 2.7) this.nextAttack();
+        break;
+      case 'guard': {
+        this.club = lerp(this.club, 1.25, dt * 4);
+        const cx0 = lx - 10, cy0 = F - 184, d2 = (p.x - cx0) ** 2 + (p.y - cy0) ** 2;
+        if (d2 < (62 + r) ** 2) {
+          if (p.cur === 2 || p.glow > 0) {
+            this.won = 'blow'; this.wonT = 0; this.flash = .6; this.shake = .5; Sound.drum(1); Sound.chord(); this.addBonus(500); p.inv = 99;
+            this.burst(cx0, cy0, 26, GOLD, 240);
+            this.speak('Lankini', 'Brahma foretold this: when a vanara strikes me down, Lanka\'s end draws near. Enter, mighty one.', 5);
+          } else if (this.pushT <= 0) { this.pushT = 1; this.say('Grow mighty to strike!', p.x, p.y - 50, '#ffd0d0', 20); p.sx -= 50; }
+        }
+        if (this.pt > 2.8) { this.ph = 'idle'; this.pt = 0; }
+        break;
+      }
+    }
+    // touching her outside an opening
+    if (this.ph !== 'guard' && !(p.cur === 0 && p.y > F - 62) && (p.x - lx) ** 2 + (p.y - (F - 170)) ** 2 < (72 + r) ** 2) { if (this.hurt()) { p.sx -= 60; p.vy = -300; } }
+    for (const w of this.waves) { w.x += w.v * dt; if (Math.abs(p.x - w.x) < 24 + r && p.y + r > F - 48 && this.hurt()) p.vy = -460; }
+    this.waves = this.waves.filter(w => w.x > -60);
+    for (const k of this.rocks) {
+      k.x += k.vx * dt; k.y += k.vy * dt; k.vy += 600 * dt;
+      if ((p.x - k.x) ** 2 + (p.y - k.y) ** 2 < (14 + r) ** 2) { k.dead = true; if (this.hurt()) p.vy = -300; }
+      if (k.y > F) { k.dead = true; this.burst(k.x, F - 4, 8, '#ff9a4a', 120); }
+    }
+    this.rocks = this.rocks.filter(k => !k.dead);
+  }
+  drawScene(c) {
+    drawLankaNight(c, 0, this.t, this.floorY);
+    drawGate(c, View.w - 160, this.floorY, this.t, this.won && this.wonT > 1.5);
+  }
+  drawMid(c) {
+    const F = this.floorY, lx = this.lx();
+    if (this.ph === 'sweep' && !this.won) {
+      const live = this.pt >= .9 && this.pt < 1.25;
+      c.fillStyle = live ? 'rgba(255,140,60,.55)' : `rgba(255,90,90,${.15 + .15 * Math.sin(this.t * 20)})`;
+      c.fillRect(0, this.bandY - 26, lx - 30, 52);
+      if (!live) { c.setLineDash([10, 8]); c.lineWidth = 2; c.strokeStyle = 'rgba(255,170,170,.8)'; c.strokeRect(0, this.bandY - 26, lx - 30, 52); c.setLineDash([]); }
+    }
+    for (const w of this.waves) {
+      c.beginPath(); c.moveTo(w.x - 30, F); c.quadraticCurveTo(w.x - 14, F - 52, w.x + 4, F - 44); c.quadraticCurveTo(w.x + 16, F - 30, w.x + 26, F);
+      c.closePath(); c.fillStyle = 'rgba(150,90,220,.8)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#e8d0ff'; c.stroke();
+    }
+    for (const k of this.rocks) { const g = c.createRadialGradient(k.x, k.y, 2, k.x, k.y, 22); g.addColorStop(0, 'rgba(255,190,90,.8)'); g.addColorStop(1, 'rgba(255,120,40,0)'); c.fillStyle = g; c.fillRect(k.x - 22, k.y - 22, 44, 44); blob(c, k.x, k.y, 10, '#6b3a2a', 2.5); }
+    drawLankini(c, lx, F, this.t, { club: this.club, guard: this.ph === 'guard' && !this.won, kneel: this.kneel, flash: this.flash, closed: !this.won && !this.gapOpen() });
+  }
+}
+
+// ---------- Level 6: Lanka by night (stealth) ----------
+const L6_LEN = 6400, L6_FLOOR = 480;
+function genLankaNight() {
+  const R = rng(6006), o = []; let id = 0;
+  const add = e => { e.id = id++; o.push(e); return e; };
+  const lotus = (x, y) => add({ type: 'lotus', x, y, ph: R() * 6 });
+  const roofs = [[500, 820, 380], [900, 1150, 300], [1250, 1600, 380], [1750, 2100, 320], [2200, 2450, 240], [2550, 2950, 330], [3350, 3650, 380], [3750, 4100, 300], [4250, 4600, 360], [4700, 5150, 280], [5300, 5600, 370], [5700, 6000, 300]];
+  roofs.forEach(([x0, x1, top], i) => { add({ type: 'roof', x: (x0 + x1) / 2, x0, x1, top, dome: i % 3 === 1 }); for (let k = 0; k < 3; k++) lotus(x0 + (x1 - x0) * (.25 + k * .25), top - 40); });
+  const roofTop = x => { let t = L6_FLOOR; for (const [x0, x1, top] of roofs) if (x >= x0 && x <= x1) t = Math.min(t, top); return t; };
+  for (const x of [640, 1180, 1700, 2150, 2750, 3250, 3900, 4450, 4950, 5450, 5900]) add({ type: 'lantern', x, y: 150 + (x % 3) * 12, y2: roofTop(x), ph: R() * 6 });
+  const guard = (x0, x1, y, sp) => add({ type: 'guard', x: x0, x0, x1, gy: y, dir: 1, sp, wait: 0, alert: 0 });
+  guard(700, 1300, L6_FLOOR, 45); guard(1900, 2700, L6_FLOOR, 50); guard(2600, 2900, 330, 35); guard(3500, 4200, L6_FLOOR, 55); guard(4300, 5000, L6_FLOOR, 55); guard(4760, 5100, 280, 40); guard(5350, 6200, L6_FLOOR, 60);
+  for (const x of [300, 1450, 3100, 4650, 6150]) lotus(x, 420);
+  for (const [x, y] of [[1020, 240], [2320, 180], [4000, 240], [5000, 220]]) add({ type: 'orb', x, y, ph: R() * 6 });
+  add({ type: 'cp', x: 3200 });
+  o.sort((a, b) => a.x - b.x); return o;
+}
+class LankaLevel extends GroundLevel {
+  config() { return { walk: true, jump: true, jumpV: 600, floorY: L6_FLOOR, len: L6_LEN, par: 100, drainHold: 0, drainGlide: 0, bonusLabel: 'Unseen in Lanka' }; }
+  gen() { return genLankaNight(); }
+  startPose(p) { p.x = 120; p.y = L6_FLOOR - 16; p.ang = 0; }
+  onReset(cp) {
+    this.susp = 0; this.alarms = 0; this.grace = 0; this.seenBy = new Set(); this.everAlarm = this.everAlarm || false;
+    if (cp) { this.p.x = cp.cpx; this.p.y = L6_FLOOR - 16; }
+    this.camX = clamp(this.p.x - View.w * .4, 0, Math.max(0, this.len + 200 - View.w)); this.p.sx = this.p.x - this.camX;
+  }
+  onLeap() { this.showHint('cat', 'Z: shrink to cat size · stay out of light and sight', 'SHRINK to cat size · stay out of light and sight'); }
+  leapVy() { return -300; }
+  goal2() { return { label: 'Never raise the alarm', ok: !this.everAlarm }; }
+  objUpdate(o, dt, dx, r) {
+    const p = this.p;
+    if (o.type === 'roof') {
+      if (o.x - this.camX < View.w * .7) this.showHint('jump', 'Space: jump onto the rooftops · hold to float', 'FLY: jump onto the rooftops · hold to float');
+      if (!p.landed && p.vy >= 0 && p.x >= o.x0 && p.x <= o.x1 && p.py + r <= o.top + 4 && p.y + r >= o.top) { p.landed = o; p.y = o.top - r; p.vy = 0; }
+      return;
+    }
+    if (o.type === 'guard') {
+      if (o.alert > 0) { o.alert -= dt; o.dir = Math.sign(p.x - o.x) || o.dir; }
+      else if (o.wait > 0) { o.wait -= dt; if (o.wait <= 0) o.dir = -o.dir; }
+      else { o.x += o.dir * o.sp * dt; if (o.x > o.x1 || o.x < o.x0) { o.x = clamp(o.x, o.x0, o.x1); o.wait = 1.3; } }
+      const ex = o.x + o.dir * 8, ey = o.gy - 82, vx = p.x - ex, vy = p.y - ey, d = Math.hypot(vx, vy);
+      const ang = Math.atan2(vy, vx * o.dir) - .12;
+      o.seeing = d < 240 && Math.abs(ang) < .34;
+      if (o.seeing) this.seen.push(o);
+      return;
+    }
+    if (o.type === 'lantern') {
+      const lx = o.x + Math.sin(this.t * 1.2 + o.ph) * 10, k = (p.y - o.y) / (o.y2 - o.y);
+      o.lit = k > 0 && k < 1 && Math.abs(p.x - lx) < 10 + 80 * k;
+      if (o.lit) this.seen.push(o);
+    }
+  }
+  levelUpdate(dt) {
+    const p = this.p;
+    if (p.landed && (p.x < p.landed.x0 - 4 || p.x > p.landed.x1 + 4)) p.landed = null;
+    if (p.landed) p.y = p.landed.top - 16 * p.size;
+    this.grace = Math.max(0, this.grace - dt);
+    const watched = this.grace > 0 || p.glow > 0 ? [] : this.seen;
+    if (watched.length) for (const o of watched) this.susp += dt * (o.type === 'guard' ? [1.6, 3.2, 6] : [1, 2.4, 6])[p.cur];
+    else this.susp = Math.max(0, this.susp - dt * .3);
+    this.lastSeen = this.seen; this.seen = [];
+    if (this.susp >= 1) {
+      this.susp = 0; this.alarms++; this.everAlarm = true; this.grace = 1.5; Sound.drum(1); Sound.chime(false); this.shake = .3;
+      for (const o of this.objs) if (o.type === 'guard' && Math.abs(o.x - p.x) < 700) o.alert = 2.2;
+      this.say(this.alarms < 3 ? `Alarm! (${this.alarms}/3)` : 'Back to the checkpoint', p.x, p.y - 60, '#ff8a8a', 24);
+      if (this.alarms >= 3) { // three alarms: back to the last checkpoint
+        this.alarms = 0; this.lives--; p.inv = 2;
+        if (this.lives <= 0) { this.state = 'dead'; this.endT = 0; return; }
+        p.x = this.cp ? this.cp.cpx : 120; p.y = L6_FLOOR - 16; p.vy = 0; p.landed = null;
+      }
+    }
+  }
+  reset(cp) { this.seen = []; super.reset(cp); }
+  shadowY() { return this.p.landed ? this.p.landed.top + 2 : L6_FLOOR + 2; }
+  drawScene(c, camX) { drawLankaNight(c, camX, this.t, L6_FLOOR); }
+  objDraw(c, o, x, layer) {
+    const t = this.t;
+    if (o.type === 'roof' && layer === 'back') {
+      const w = o.x1 - o.x0, x0 = x - w / 2;
+      c.fillStyle = '#3b2a5a'; c.fillRect(x0, o.top, w, L6_FLOOR - o.top); c.lineWidth = 3; c.strokeStyle = INK; c.strokeRect(x0, o.top, w, L6_FLOOR - o.top);
+      for (let wx = x0 + 30; wx < x0 + w - 30; wx += 60) for (let wy = o.top + 30; wy < L6_FLOOR - 40; wy += 60) {
+        c.beginPath(); c.moveTo(wx - 10, wy + 22); c.lineTo(wx - 10, wy); c.arc(wx, wy, 10, Math.PI, 0); c.lineTo(wx + 10, wy + 22); c.closePath();
+        c.fillStyle = (wx + wy) % 3 ? 'rgba(255,200,110,.75)' : '#1d1438'; c.fill();
+      }
+      c.fillStyle = '#d9a53a'; c.fillRect(x0 - 8, o.top - 8, w + 16, 10); c.strokeRect(x0 - 8, o.top - 8, w + 16, 10);
+      if (o.dome) { c.beginPath(); c.arc(x, o.top - 8, 22, Math.PI, 0); c.fillStyle = '#d9a53a'; c.fill(); c.stroke(); }
+    } else if (o.type === 'lantern' && layer === 'back') {
+      const lx = x + Math.sin(t * 1.2 + o.ph) * 10;
+      const g = c.createLinearGradient(0, o.y, 0, o.y2); g.addColorStop(0, 'rgba(255,210,120,.35)'); g.addColorStop(1, 'rgba(255,210,120,.12)');
+      c.beginPath(); c.moveTo(lx - 10, o.y); c.lineTo(lx + 10, o.y); c.lineTo(lx + 90, o.y2); c.lineTo(lx - 90, o.y2); c.closePath(); c.fillStyle = o.lit ? 'rgba(255,150,120,.35)' : g; c.fill();
+      c.strokeStyle = '#2a1a10'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x, 0); c.lineTo(lx, o.y - 12); c.stroke();
+      rr(c, lx - 9, o.y - 14, 18, 22, 6); c.fillStyle = '#d6402a'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+      c.fillStyle = '#ffe28a'; c.fillRect(lx - 4, o.y - 9, 8, 12);
+    } else if (o.type === 'guard' && layer === 'mid') {
+      const ex = x + o.dir * 8, ey = o.gy - 82, a0 = o.dir > 0 ? .12 : Math.PI - .12;
+      c.beginPath(); c.moveTo(ex, ey); c.arc(ex, ey, 240, a0 - .34, a0 + .34); c.closePath();
+      c.fillStyle = o.alert > 0 ? 'rgba(255,90,90,.3)' : o.seeing ? 'rgba(255,200,90,.32)' : 'rgba(255,230,150,.14)'; c.fill();
+      drawRakshasa(c, x, o.gy, o.dir, t, { walk: o.wait <= 0 && o.alert <= 0, alert: o.alert > 0, seeing: o.seeing });
+    }
+  }
+  drawFront(c, camX) { // the gate of Ashok Vatika at the end of the city
+    const x = L6_LEN + 120 - camX; if (x > View.w + 300) return;
+    c.fillStyle = '#1e5a3e'; for (const [dx, dy, r] of [[-120, -150, 60], [-60, -190, 70], [150, -170, 66], [220, -130, 56]]) { c.beginPath(); c.arc(x + dx, L6_FLOOR + dy, r, 0, TAU); c.fill(); }
+    c.fillStyle = '#c99434'; c.fillRect(x - 10, L6_FLOOR - 200, 20, 200); c.fillRect(x + 110, L6_FLOOR - 200, 20, 200);
+    c.beginPath(); c.moveTo(x - 20, L6_FLOOR - 200); c.quadraticCurveTo(x + 60, L6_FLOOR - 270, x + 140, L6_FLOOR - 200); c.lineWidth = 12; c.strokeStyle = '#c99434'; c.stroke();
+    text(c, 'Ashok Vatika', x + 60, L6_FLOOR - 230, { size: 18, font: TF, w: 400, align: 'center', color: GOLD, lw: 4 });
+  }
+  drawHudExtra(c) {
+    const L = View.safe.l + 14, y = View.safe.t + 90, w = 150;
+    text(c, '!', L + 10, y + 7, { size: 16, align: 'center', color: '#ff8a8a', lw: 4 });
+    rr(c, L + 26, y, w, 14, 7); c.fillStyle = 'rgba(20,10,40,.6)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+    if (this.susp > 0) { rr(c, L + 28, y + 2, (w - 4) * Math.min(1, this.susp), 10, 5); c.fillStyle = '#ff7a5a'; c.fill(); }
+    for (let i = 0; i < 3; i++) { const bx = L + 26 + w + 16 + i * 20; c.beginPath(); c.arc(bx, y + 7, 7, 0, TAU); c.fillStyle = i < this.alarms ? '#ff5a5a' : 'rgba(255,244,220,.25)'; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke(); }
+  }
+}
+
+// ---------- Level 7: Ashok Vatika ----------
+function drawSita(c, x, fy, t, look) { // seated beneath the trees, calm and dignified
+  c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+  const g = c.createRadialGradient(x, fy - 80, 10, x, fy - 80, 170); g.addColorStop(0, 'rgba(255,245,210,.4)'); g.addColorStop(1, 'rgba(255,245,210,0)');
+  c.fillStyle = g; c.fillRect(x - 170, fy - 250, 340, 340);
+  rr(c, x - 52, fy - 34, 104, 34, 8); c.fillStyle = '#7d7393'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(x - 20, fy - 108); c.quadraticCurveTo(x - 46, fy - 70, x - 50, fy - 34); c.lineTo(x + 50, fy - 34); c.quadraticCurveTo(x + 46, fy - 70, x + 20, fy - 108); c.closePath();
+  c.fillStyle = '#f2b632'; c.fill(); c.lineWidth = 3; c.stroke();
+  c.beginPath(); c.moveTo(x - 50, fy - 36); c.lineTo(x + 50, fy - 36); c.lineWidth = 5; c.strokeStyle = '#c0392b'; c.stroke();
+  c.beginPath(); c.moveTo(x + 18, fy - 106); c.quadraticCurveTo(x - 10, fy - 80, x - 40, fy - 44); c.lineWidth = 4; c.strokeStyle = '#c0392b'; c.stroke();
+  blob(c, x - 6, fy - 62, 6, '#c98b5e', 2); blob(c, x + 6, fy - 62, 6, '#c98b5e', 2);
+  const hy = fy - 124;
+  c.beginPath(); c.arc(x, hy - 2, 21, Math.PI * 1.05, Math.PI * 1.95 + .3); c.lineTo(x + 24, hy + 18); c.lineTo(x - 24, hy + 18); c.closePath(); c.fillStyle = '#f2b632'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  blob(c, x, hy + 2, 15, '#c98b5e', 2.5);
+  c.beginPath(); c.arc(x, hy - 2, 15, Math.PI * 1.1, Math.PI * 1.9); c.lineWidth = 5; c.strokeStyle = '#2a1a14'; c.stroke();
+  blob(c, x, hy - 6, 1.8, '#c0392b', 0);
+  c.lineWidth = 2; c.strokeStyle = INK;
+  if (look > .5) { for (const s of [-1, 1]) { c.beginPath(); c.arc(x + s * 6, hy + 1, 1.8, 0, TAU); c.fillStyle = INK; c.fill(); } c.beginPath(); c.arc(x, hy + 7, 4, .2, Math.PI - .2); c.stroke(); }
+  else { for (const s of [-1, 1]) { c.beginPath(); c.arc(x + s * 6, hy + 1, 3, .3, Math.PI - .3); c.stroke(); } c.beginPath(); c.moveTo(x - 3, hy + 9); c.lineTo(x + 3, hy + 9); c.stroke(); }
+  c.restore();
+}
+function drawGuardSit(c, x, fy, t, sleep, dir) {
+  c.save(); c.translate(x, fy); c.scale(dir, 1); c.lineJoin = 'round';
+  rr(c, -20, -24, 40, 24, 6); c.fillStyle = '#5a4a6a'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.ellipse(0, -48, 18, 24, 0, 0, TAU); c.fillStyle = '#8a2a5a'; c.fill(); c.stroke();
+  c.strokeStyle = '#6b4a2a'; c.lineWidth = 3; c.beginPath(); c.moveTo(16, 0); c.lineTo(16 + sleep * 22, -110 + sleep * 10); c.stroke();
+  c.save(); c.translate(0, -76); c.rotate(sleep * .5);
+  blob(c, 0, 0, 13, '#5a8f6a', 2.5); c.beginPath(); c.arc(0, -2, 13, Math.PI, 0); c.fillStyle = '#2a1a2a'; c.fill();
+  c.lineWidth = 2; c.strokeStyle = INK;
+  if (sleep > .6) { c.beginPath(); c.moveTo(3, 0); c.lineTo(9, 0); c.stroke(); } else { c.beginPath(); c.arc(6, 0, 2, 0, TAU); c.fillStyle = '#ffd23f'; c.fill(); }
+  c.restore(); c.restore();
+  if (sleep > .9) for (let i = 0; i < 2; i++) { const k = (t * .5 + i * .5) % 1; c.globalAlpha = 1 - k; text(c, 'z', x + dir * (14 + k * 16), fy - 96 - k * 34, { size: 14 + k * 8, color: '#cfe0ff', lw: 3 }); c.globalAlpha = 1; }
+}
+class VatikaLevel extends GroundLevel {
+  config() { return { scroll: false, floorY: 480, par: 80, len: 1, drainHold: 1.2, drainGlide: .3, bonusLabel: 'Patience and devotion' }; }
+  startPose(p) { p.sx = 90; p.y = 260; }
+  titleX() { return View.w * .45; }
+  tree() { return { x: View.w * .3, y: 180, rx: 150, ry: 92 }; }
+  sitaX() { return View.w * .74; }
+  onReset() { this.ph = 'enter'; this.sleep = 0; this.aware = 0; this.seen = 0; this.meetT = 0; this.spawnT = 1; this.inTree = false; this.said = {}; }
+  onLeap() { this.showHint('tree', 'Shrink and hide in the shimshapa tree', 'SHRINK and hide in the shimshapa tree'); }
+  xRange() { return [50, this.sitaX() - 70]; }
+  heroOpts() { return { glow: this.p.glow > 0, flip: this.ph !== 'meet' && this.p.face < 0, ring: this.ph === 'meet' && this.meetT > 1.2 }; }
+  progress() { return this.ph === 'meet' ? 1 : this.ph === 'asleep' ? .8 : this.sleep * .7; }
+  cpFrac() { return null; }
+  finished() { return this.ph === 'meet' && this.meetT > 19; }
+  goal2() { return { label: 'Stay unseen by the guards', ok: this.seen === 0 }; }
+  levelUpdate(dt) {
+    const p = this.p, T = this.tree(), S = this.sitaX();
+    this.inTree = ((p.x - T.x) / T.rx) ** 2 + ((p.y - T.y) / T.ry) ** 2 < 1 && p.cur <= 1;
+    if (this.ph !== 'meet' && (this.spawnT -= dt) <= 0) { this.spawnT = 3; if (this.objs.filter(o => o.type === 'lotus' && !o.dead).length < 3) this.add({ type: 'lotus', x: T.x + (Math.random() - .5) * 2 * T.rx * .8, y: T.y + (Math.random() - .5) * T.ry, ph: Math.random() * 6 }); }
+    switch (this.ph) {
+      case 'enter': case 'hide':
+        if (this.inTree) { this.ph = 'hide'; this.sleep = Math.min(1, this.sleep + dt / 12); this.aware = Math.max(0, this.aware - dt * .5); this.showHint('wait', 'Stay hidden among the leaves… the guards grow drowsy', 'Stay hidden among the leaves… the guards grow drowsy'); }
+        else {
+          if (this.ph === 'hide') this.sleep = Math.max(0, this.sleep - dt / 25);
+          if (p.x > View.w * .4) this.aware += dt * [.25, .55, 1.2][p.cur]; else this.aware = Math.max(0, this.aware - dt * .4);
+          if (this.aware >= 1) { this.aware = 0; this.seen++; Sound.chime(false); this.say('A guard looks up… back to the trees', p.x, p.y - 50, '#ffd0d0', 20); p.sx = 90; p.y = 260; p.vy = 0; }
+        }
+        if (this.sleep >= 1) { this.ph = 'asleep'; Sound.chord(); this.showHint('descend', 'The guards sleep. Descend quietly to Sita Maa', 'The guards sleep. Descend quietly to Sita Maa'); }
+        break;
+      case 'asleep':
+        if (p.x > S - 170 && p.y > this.floorY - 140) { this.ph = 'meet'; this.meetT = 0; p.inv = 99; p.idx = 1; }
+        break;
+      case 'meet': {
+        this.meetT += dt; p.idx = 1; p.cur = 1; p.size = lerp(p.size, 1, dt * 3);
+        p.sx = lerp(p.sx, S - 135, dt * 3); p.x = p.sx; p.y = lerp(p.y, this.floorY - 48, dt * 3); p.vy = 0; p.ang = lerp(p.ang, -.42, dt * 3); p.face = 1;
+        const at = (k, tt, f) => { if (this.meetT >= tt && !this.said[k]) { this.said[k] = 1; f(); } };
+        at('h1', .3, () => this.speak('Hanuman', 'Mother, I am Hanuman, messenger of Shri Rama. He sends you his ring as a sign.', 5));
+        at('ring', 1.2, () => { Sound.chime(true); this.burst(p.x + 55, p.y - 10, 16, GOLD, 120); });
+        at('s1', 5.6, () => this.speak('Sita', 'This is my Rama\'s ring. Hope returns to me. Tell him I wait for him.', 5.2));
+        at('h2', 11.2, () => this.speak('Hanuman', 'Rama will come, Mother. I carry your blessing back to him.', 4.5));
+        at('end', 16, () => Sound.chord());
+        break;
+      }
+    }
+  }
+  drawScene(c) {
+    const W = View.w, F = this.floorY, t = this.t;
+    drawNightSky(c, t, F);
+    for (const [i, T] of LANKA_MID.entries()) { const x = T.x * .55 - 60; if (x < W) drawTower(c, x, F - 80, T.w * .7, T.h * .8, '#2c2050', 'rgba(217,165,58,.4)', false, t, i); }
+    c.fillStyle = '#16362a'; for (let x = -40; x < W + 60; x += 70) { c.beginPath(); c.arc(x, F - 60 - (x * 7 % 40), 60, 0, TAU); c.fill(); }
+    const g = c.createLinearGradient(0, F, 0, VH); g.addColorStop(0, '#24553c'); g.addColorStop(1, '#0f2a1e');
+    c.fillStyle = g; c.fillRect(-20, F, W + 40, VH - F + 20);
+    for (let x = 20; x < W; x += 47) { c.fillStyle = x % 3 ? '#ff8fc0' : '#ffd23f'; c.beginPath(); c.arc(x, F + 14 + (x * 13 % 30), 3, 0, TAU); c.fill(); }
+    // ashoka tree sheltering Sita
+    const S = this.sitaX();
+    c.fillStyle = '#4a3020'; c.fillRect(S + 60, F - 210, 22, 210);
+    for (const [dx, dy, r] of [[40, -230, 70], [110, -250, 62], [70, -280, 56]]) { c.beginPath(); c.arc(S + dx, F + dy, r, 0, TAU); c.fillStyle = '#245c3c'; c.fill(); }
+    // shimshapa trunk (canopy is drawn in front)
+    const T = this.tree();
+    c.beginPath(); c.moveTo(T.x - 18, F); c.quadraticCurveTo(T.x - 10, T.y + 60, T.x - 30, T.y + 20); c.lineTo(T.x + 26, T.y + 20); c.quadraticCurveTo(T.x + 10, T.y + 60, T.x + 18, F); c.closePath();
+    c.fillStyle = '#5a3a24'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  }
+  drawMid(c) {
+    const S = this.sitaX(), F = this.floorY, sl = this.ph === 'asleep' || this.ph === 'meet' ? 1 : this.sleep;
+    drawGuardSit(c, S - 250, F, this.t, sl, 1);
+    drawGuardSit(c, S + 150, F, this.t, sl, -1);
+    drawSita(c, S, F, this.t, this.ph === 'meet' && this.meetT > 5 ? 1 : 0);
+  }
+  drawFront(c) {
+    const T = this.tree(), t = this.t;
+    c.save(); c.globalAlpha = this.inTree ? .72 : .97;
+    for (const [dx, dy, r] of [[-110, 10, 62], [-60, -40, 70], [10, -55, 76], [80, -30, 68], [120, 15, 56], [40, 30, 64], [-40, 30, 60]]) {
+      c.beginPath(); c.arc(T.x + dx, T.y + dy, r, 0, TAU); c.fillStyle = '#1f6b44'; c.fill();
+    }
+    for (const [dx, dy, r] of [[-60, -55, 34], [20, -70, 38], [90, -45, 30]]) { c.beginPath(); c.arc(T.x + dx, T.y + dy, r, 0, TAU); c.fillStyle = '#2f8a58'; c.fill(); }
+    for (let i = 0; i < 18; i++) { const a = i * 2.4, rr2 = 30 + (i * 37 % 100); c.fillStyle = '#ff7a3a'; c.beginPath(); c.arc(T.x + Math.cos(a) * rr2, T.y + Math.sin(a) * rr2 * .6, 3, 0, TAU); c.fill(); }
+    c.restore();
+    if (this.ph === 'meet' && this.meetT > 15.5) {
+      const a = smooth((this.meetT - 15.5) / 1.5);
+      c.globalAlpha = a; c.fillStyle = 'rgba(10,6,30,.45)'; c.fillRect(0, 0, View.w, VH);
+      text(c, 'Hanuman brings hope to Rama', View.w / 2, 230, { size: 40, font: TF, w: 400, align: 'center', color: GOLD, lw: 7 });
+      text(c, 'Jai Shri Ram', View.w / 2, 284, { size: 26, font: TF, w: 400, align: 'center', lw: 5 });
+      c.globalAlpha = 1;
+    }
+  }
+  drawHudExtra(c) {
+    if (this.ph !== 'enter' && this.ph !== 'hide') return;
+    const L = View.safe.l + 14, y = View.safe.t + 90, w = 150;
+    text(c, 'z', L + 10, y + 6, { size: 16, align: 'center', color: '#cfe0ff', lw: 4 });
+    rr(c, L + 26, y, w, 14, 7); c.fillStyle = 'rgba(20,10,40,.6)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+    if (this.sleep > 0) { rr(c, L + 28, y + 2, (w - 4) * this.sleep, 10, 5); c.fillStyle = '#9ab8ff'; c.fill(); }
+    if (this.aware > 0) { rr(c, L + 28, y + 18, (w - 4) * this.aware, 6, 3); c.fillStyle = '#ff8a8a'; c.fill(); }
+  }
+}
+
 // ---------- Levels ----------
 const LEVELS = [
   { id: 1, name: 'The Great Leap', place: 'Mahendra', from: 'Mahendra', to: 'Mainaka', sub: 'From Mahendra mountain, across the ocean to Lanka', goal: 'Cross the sea', doneLine: 'Mainaka rises to greet you', outro: 'Mainaka rises from the sea to offer Hanuman rest.', make: d => new LeapLevel(d) },
   { id: 2, name: 'Mainaka Mountain', place: 'Mainaka', from: 'Mainaka', to: 'Surasa', sub: 'The golden mountain rises to offer rest', goal: 'Pass Mainaka', doneLine: 'Onward, with Mainaka\'s blessing', outro: 'Hanuman honours Mainaka\'s kindness, and flies on without delay.', make: d => new MainakaLevel(d) },
   { id: 3, name: 'Surasa', place: 'Surasa', from: 'Trial', to: 'Blessing', sub: 'The mother of serpents tests Hanuman', goal: 'Win Surasa\'s blessing', doneLine: 'Surasa blesses Hanuman', outro: 'Surasa blesses Hanuman and wishes him success in Rama\'s work.', make: d => new SurasaLevel(d) },
   { id: 4, name: 'Simhika', place: 'Simhika', from: 'Simhika', to: 'Lanka', sub: 'Beware the demoness who seizes shadows', goal: 'Defeat Simhika', doneLine: 'The shores of Lanka glow ahead', outro: 'Simhika is defeated. The golden shores of Lanka glow on the horizon.', make: d => new SimhikaLevel(d) },
-  { id: 5, name: 'Lankini at the Gate', place: 'Lanka gate' },
-  { id: 6, name: 'Lanka by Night', place: 'Lanka' },
-  { id: 7, name: 'Ashok Vatika', place: 'Ashok Vatika' }
+  { id: 5, name: 'Lankini at the Gate', place: 'Lanka gate', from: 'Gate', to: 'Lanka', sub: 'The guardian of Lanka blocks the way', goal: 'Enter Lanka', doneLine: 'The gate of Lanka stands open', outro: 'Lankini steps aside, and Hanuman enters the golden city.', make: d => new LankiniLevel(d) },
+  { id: 6, name: 'Lanka by Night', place: 'Lanka', from: 'Lanka', to: 'Vatika', sub: 'Small as a cat, search the golden city', goal: 'Cross Lanka', doneLine: 'Ashok Vatika lies ahead', outro: 'Through lantern light and watchful guards, Hanuman reaches the Ashok Vatika.', make: d => new LankaLevel(d) },
+  { id: 7, name: 'Ashok Vatika', place: 'Ashok Vatika', from: 'Garden', to: 'Sita Maa', sub: 'At last, the grove where Sita Maa waits', goal: 'Find Sita Maa', outro: 'Hanuman has found Sita Maa and carries hope back to Rama.', make: d => new VatikaLevel(d) }
 ];
 
 // ---------- UI helpers ----------
@@ -1403,8 +1930,17 @@ const Game = {
       </table>
       <div class="goals">${r.goals.map(([l, ok]) => `${ck(ok)} ${l}`).join(' · ')}${best ? ` · Best ${best.score}` : ''}</div>
       <div class="row"><button class="btn" data-a="next">Continue journey</button><button class="btn ghost" data-a="replay">Replay</button><button class="btn ghost" data-a="map">Map</button></div>`,
-      { next: () => next && next.make ? this.start(next.id) : (this.openMap(), UI.toast(`${next ? next.name : 'The next trial'} is coming in the next build`)),
+      { next: () => next && next.make ? this.start(next.id) : this.showFinale(),
         replay: () => this.start(lv.id), map: () => this.openMap() });
+  },
+  showFinale() { // the whole journey, Mahendra to Ashok Vatika
+    this.scene = 'results';
+    const best = Save.data.best, total = LEVELS.reduce((a, d) => a + ((best[d.id] || {}).score || 0), 0), stars = LEVELS.reduce((a, d) => a + ((best[d.id] || {}).stars || 0), 0);
+    UI.card(`<h2>The journey is complete</h2><div class="sub">Hanuman crossed the ocean, found Sita Maa in the Ashok Vatika, and carries hope back to Rama. Jai Shri Ram!</div>
+      <table class="sum">${LEVELS.map(d => { const b = best[d.id] || { score: 0, stars: 0 }; return `<tr><td>${d.id}. ${d.name}</td><td><span style="color:var(--gold)">${'★'.repeat(b.stars)}${'☆'.repeat(3 - b.stars)}</span> ${b.score}</td></tr>`; }).join('')}
+        <tr class="tot"><td>Best total · ${stars}/21 stars</td><td>${total}</td></tr></table>
+      <div class="row"><button class="btn" data-a="again">Journey again</button><button class="btn ghost" data-a="map">Journey map</button></div>`,
+      { again: () => this.start(1), map: () => this.openMap() });
   },
   showOver(msg = '') {
     const lv = this.lv, canReward = CG.rewardedAvailable && !this.rewardUsed && lv.cp;

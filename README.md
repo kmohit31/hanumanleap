@@ -10,9 +10,9 @@ Everything is in a single `index.html`: canvas art, Web Audio sound, and plain J
 - [x] 2. Mainaka Mountain: land on golden ledges to refill energy, but don't linger
 - [x] 3. Surasa: grow to match her mouth, then shrink tiny and dart in and out
 - [x] 4. Simhika: keep your shadow from her grasp, hide in clouds, dive to strike
-- [ ] 5. Lankini at the Gate
-- [ ] 6. Lanka by Night
-- [ ] 7. Ashok Vatika
+- [x] 5. Lankini at the Gate: dodge her attacks, then land one mighty blow or slip between her feet
+- [x] 6. Lanka by Night: stealth at cat size across rooftops, avoiding lantern light and guards
+- [x] 7. Ashok Vatika: hide in the shimshapa tree until the guards sleep, then present Rama's ring to Sita Maa
 
 ## Run locally
 
@@ -24,7 +24,7 @@ Then open http://localhost:8765. Add `?cgmock=1` to simulate the CrazyGames SDK 
 
 ## Controls
 
-- Space / Up: fly (hold to rise, release to glide)
+- Space / Up: fly (hold to rise, release to glide); in Lanka by Night, jump (hold to float)
 - Left / Right: slow down / speed up
 - Z: shrink · X or hold Shift: grow (in Surasa's trial, hold to grow or shrink smoothly)
 - Down: dive
