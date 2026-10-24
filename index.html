@@ -547,7 +547,7 @@ class Level {
   }
   hurt() {
     const p = this.p; if (p.inv > 0 || p.glow > 0 || this.state !== 'fly') return false;
-    this.hits++; this.lives--; p.inv = 2; this.shake = .35; Sound.drum(.6);
+    this.hits++; this.lives--; p.inv = 2.6; this.shake = .35; Sound.drum(.6);
     this.burst(p.x, p.y, 14, '#ffe2b0');
     if (this.lives <= 0) { this.state = 'dead'; this.endT = 0; Sound.drum(.9); }
     return true;
@@ -577,7 +577,7 @@ class Level {
     for (const s of this.texts) { c.globalAlpha = 1 - smooth((s.t - .8) / .6); text(c, s.s, s.x - camX, s.y - s.t * 40, { size: s.size, color: s.color, align: 'center', font: s.font, w: s.font === TF ? 400 : 800 }); }
     c.globalAlpha = 1;
   }
-  goal2() { return { label: 'Gather 70% of the lotus', ok: this.lotus >= this.lotusTotal * .7 }; }
+  goal2() { return { label: 'Gather 60% of the lotus', ok: this.lotus >= this.lotusTotal * .6 }; }
   result() {
     const timeBonus = Math.max(0, Math.round((this.par - this.time) * 15)), noHit = this.hits === 0 ? 500 : 0, g2 = this.goal2();
     const rows = [[this.lotusTotal ? `Lotus flowers ${this.lotus}/${this.lotusTotal}` : `Lotus flowers ${this.lotus}`, this.lotus * 10], [`Jai Shri Ram orbs ${this.orbs}`, this.orbs * 25]];
@@ -885,7 +885,7 @@ class FlightLevel extends Level {
       p.energy = Math.max(0, p.energy);
       if (p.energy < 25) this.showHint('energy', 'Low energy: collect lotus flowers', 'Low energy: collect lotus flowers');
       p.vy += (dive ? 1700 : 800) * dt;
-      if (!hold && !dive && p.vy > 210) p.vy -= (p.vy - 210) * Math.min(1, dt * 6);
+      if (!hold && !dive && p.vy > 180) p.vy -= (p.vy - 180) * Math.min(1, dt * 6);
       p.vy = clamp(p.vy, -380, 560); p.y += p.vy * dt;
       const top = 44 + r;
       if (p.y < top) { p.y = top; if (p.vy < 0) p.vy = 0; }
@@ -936,7 +936,7 @@ class FlightLevel extends Level {
           o.f += dt * (o.sc ? 22 : 12);
           if (o.sc) { o.x += o.svx * dt; o.y += o.svy * dt; o.svy -= 200 * dt; if (o.y < -60) o.dead = true; break; }
           o.x -= o.vx * dt; o.y = o.by + Math.sin(this.t * 2.4 + o.ph) * o.amp;
-          if (dx * dx + (p.y - o.y) ** 2 < (r + 12) ** 2) {
+          if (dx * dx + (p.y - o.y) ** 2 < (r * .8 + 10) ** 2) { // hazards use a slightly smaller hitbox than pickups
             if (p.glow > 0 || p.cur === 2) { o.sc = true; o.svx = 150 + Math.random() * 120; o.svy = -120 - Math.random() * 120; this.addBonus(5); }
             else if (this.hurt()) { o.sc = true; o.svx = 120; o.svy = -160; }
           }
@@ -951,7 +951,7 @@ class FlightLevel extends Level {
           o.t += dt; o.x -= 40 * dt;
           o.h = o.H * (o.t < 1.3 ? smooth(o.t / 1.3) : o.t < 3.4 ? 1 : 1 - smooth((o.t - 3.4) / 1.2));
           if (o.t > 4.7) { o.dead = true; break; }
-          if (Math.abs(dx) < o.w * 2.2 && p.y + r * .8 > SURF - o.h * Math.exp(-dx * dx / (2 * o.w * o.w))) { if (this.hurt()) p.vy = -460; }
+          if (Math.abs(dx) < o.w * 2.2 && p.y + r * .6 > SURF - o.h * Math.exp(-dx * dx / (2 * o.w * o.w))) { if (this.hurt()) p.vy = -460; }
           break;
         }
         case 'spray': {
@@ -960,7 +960,7 @@ class FlightLevel extends Level {
           o.t += dt;
           o.h = o.t < .9 ? 0 : o.t < 1.15 ? o.H * smooth((o.t - .9) / .25) : o.t < 2.1 ? o.H : o.H * (1 - smooth((o.t - 2.1) / .4));
           if (o.t > 2.6) { o.dead = true; break; }
-          if (o.h > 10 && Math.abs(dx) < 18 + r * .7 && p.y + r * .7 > SURF - o.h) { if (this.hurt()) p.vy = 200; }
+          if (o.h > 10 && Math.abs(dx) < 14 + r * .55 && p.y + r * .55 > SURF - o.h) { if (this.hurt()) p.vy = 200; }
           if (o.h > 10 && Math.random() < dt * 30) this.fx.push({ x: o.x + (Math.random() - .5) * 30, y: SURF - o.h * Math.random(), vx: (Math.random() - .5) * 120, vy: -60 - Math.random() * 80, life: .6, t: 0, r: 2 + Math.random() * 2.5, col: '#e8f7ff', g: 500 });
           break;
         }
@@ -1105,12 +1105,12 @@ function genLeap() {
     arc(x) { const n = 5 + (R() * 3 | 0), y0 = 160 + R() * 190, a = 30 + R() * 50, up = R() < .5 ? -1 : 1; for (let i = 0; i < n; i++) lotus(x + i * 70, y0 + up * Math.sin(i / (n - 1) * Math.PI) * a); return n * 70; },
     orb(x) { const y = 110 + R() * 170; orb(x + 60, y); lotus(x, y + 50); lotus(x + 120, y + 50); return 180; },
     birds(x) { const n = 3 + (R() * 3 | 0), y0 = 120 + R() * 200; for (let i = 0; i < n; i++) bird(x + i * 90 + R() * 30, clamp(y0 + (R() - .5) * 140, 80, 380), 50 + R() * 70, 12 + R() * 28); return n * 90 + 120; },
-    wave(x) { const H = 140 + R() * 90; add({ type: 'wave', x: x + 160, H, w: 60 + H * .3, h: 0, t: 0, on: false }); lotus(x + 160, SURF - H - 55); lotus(x + 90, SURF - H - 35); lotus(x + 230, SURF - H - 35); return 440; },
-    spray(x) { const n = R() < .5 ? 1 : 2; for (let i = 0; i < n; i++) add({ type: 'spray', x: x + i * 240, H: 170 + R() * 100, h: 0, t: 0, on: false }); for (let i = 0; i < n; i++) lotus(x + i * 240, 120); return n * 240 + 120; },
+    wave(x) { const H = 110 + R() * 70; add({ type: 'wave', x: x + 160, H, w: 60 + H * .3, h: 0, t: 0, on: false }); lotus(x + 160, SURF - H - 55); lotus(x + 90, SURF - H - 35); lotus(x + 230, SURF - H - 35); return 440; },
+    spray(x) { const n = R() < .5 ? 1 : 2; for (let i = 0; i < n; i++) add({ type: 'spray', x: x + i * 240, H: 140 + R() * 80, h: 0, t: 0, on: false }); for (let i = 0; i < n; i++) lotus(x + i * 240, 120); return n * 240 + 120; },
     wall(x) { // a wall of hovering seabirds: shrink through the gap, or grow and push past
       const gc = 180 + R() * 160;
-      for (let y = gc - 27; y >= 46; y -= 30) bird(x, y, 0, 3);
-      for (let y = gc + 27; y <= SURF - 6; y += 30) bird(x, y, 0, 3);
+      for (let y = gc - 33; y >= 46; y -= 30) bird(x, y, 0, 3);
+      for (let y = gc + 33; y <= SURF - 6; y += 30) bird(x, y, 0, 3);
       add({ type: 'gapmark', x, y: gc });
       lotus(x - 90, gc); lotus(x + 90, gc); return 260;
     }
@@ -1126,7 +1126,7 @@ function genLeap() {
     }
     const d = x / LEAP_LEN;
     const pool = d < .15 ? ['arc', 'arc', 'orb'] : d < .3 ? ['arc', 'birds', 'arc', 'orb', 'birds'] : d < .5 ? ['arc', 'birds', 'wave', 'spray', 'orb', 'arc'] : ['arc', 'birds', 'wave', 'spray', 'birds', 'orb', 'wave', 'spray', 'arc'];
-    x += P[pool[R() * pool.length | 0]](x) + (430 - 230 * d) + R() * 150;
+    x += P[pool[R() * pool.length | 0]](x) + (540 - 200 * d) + R() * 160;
   }
   for (let i = 0; i < 14; i++) lotus(LEAP_LEN - 2300 + i * 140, 250 + Math.sin(i * .7) * 60);
   orb(LEAP_LEN - 1300, 180);
@@ -1170,7 +1170,7 @@ function genMainaka() {
   o.sort((a, b) => a.x - b.x); return o;
 }
 class MainakaLevel extends FlightLevel {
-  config() { return { len: MAIN_LEN, par: 75, theme: THEMES.day, drainHold: 8, drainGlide: 2.4, lowThrust: .3, lotusEnergy: 4, bonusLabel: 'Swift, gracious departures', showClock: true }; }
+  config() { return { len: MAIN_LEN, par: 75, theme: THEMES.day, drainHold: 5.5, drainGlide: 1.5, lowThrust: .45, lotusEnergy: 6, bonusLabel: 'Swift, gracious departures', showClock: true }; }
   gen() { return genMainaka(); }
   onReset() { this.lingered = 0; this.declined = this.declined || false; this.lastLedge = null; }
   speed(f) { return 230 + 120 * f; }
@@ -1182,7 +1182,7 @@ class MainakaLevel extends FlightLevel {
     if (o.summit && o.x - this.camX < View.w + 100 && !this.invited) { this.invited = true; this.speak('Mainaka', 'Rest upon my golden peaks, O son of Vayu! The ocean wishes to honour Rama\'s messenger.', 5); }
     if (p.landed === o) {
       o.linger += dt;
-      if (o.linger > (o.summit ? 3.5 : 1.6)) {
+      if (o.linger > (o.summit ? 5 : 2.6)) {
         this.timeMul = 3; this.lingered += dt;
         if (Math.random() < dt * .7) this.say('time slips away…', p.x, p.y - 60, '#ffb3b3', 18);
         if (!this.declined) { this.declined = true; this.speak('Hanuman', 'Your kindness honours me, but I may not rest until Rama\'s work is done.', 4.5); }
@@ -1200,7 +1200,7 @@ class MainakaLevel extends FlightLevel {
   levelUpdate() {
     const p = this.p, o = this.lastLedge;
     if (o && p.landed !== o && o.linger > 0) {
-      if (o.linger <= (o.summit ? 3.5 : 1.6)) { this.addBonus(20); this.say('Swift!', p.x, p.y - 40, GOLD, 22); }
+      if (o.linger <= (o.summit ? 5 : 2.6)) { this.addBonus(20); this.say('Swift!', p.x, p.y - 40, GOLD, 22); }
       if (o.summit) this.speak('Hanuman', 'Forgive me, noble Mainaka. Rama\'s work cannot wait. I bow to you and fly on.', 4.5);
       o.linger = -1; this.lastLedge = null;
     }
@@ -1318,13 +1318,13 @@ class SurasaLevel extends FlightLevel {
   }
   xRange() {
     const p = this.p, h = this.head();
-    const canEnter = this.phase === 'tiny' && p.size <= .58 && Math.abs(p.y - h.y) < h.open * .38;
+    const canEnter = this.phase === 'tiny' && p.size <= .65 && Math.abs(p.y - h.y) < h.open * .38;
     return [60 + 40 * p.size, canEnter ? h.x + 20 * h.s : h.x - 80 * h.s - 34 * p.size];
   }
   progress() { return this.phase === 'bless' ? 1 : clamp((this.round + (this.closing ? .6 : 0)) / (SURASA_T.length + 1), 0, 1); }
   cpFrac() { return SURASA_T.length / (SURASA_T.length + 1); }
   finished() { return this.phase === 'bless' && this.blessT > 4.5; }
-  goal2() { return { label: 'Finish within 1:30', ok: this.time <= 90 }; }
+  goal2() { return { label: 'Finish within 1:45', ok: this.time <= 105 }; }
   onLeap() { if (this.phase === 'intro') { this.phase = 'speak'; this.tw = 0; this.speak('Surasa', 'None may cross this ocean without entering my mouth!', 3.5); } }
   idle(dt) { if (this.phase === 'bless') { this.blessT += dt; this.bow = lerp(this.bow, 1, dt * 2); this.mouth = lerp(this.mouth, .25, dt * 3); } }
   levelUpdate(dt) {
@@ -1332,7 +1332,7 @@ class SurasaLevel extends FlightLevel {
     // lotus and orbs drift into the arena
     if ((this.spawnT -= dt) <= 0) { this.spawnT = 2.4; if (this.objs.filter(o => o.type === 'lotus' && !o.dead).length < 4) this.add({ type: 'lotus', x: 120 + Math.random() * (h.x - 330), y: 110 + Math.random() * 260, ph: Math.random() * 6 }); }
     if (['round', 'wide', 'tiny'].includes(this.phase) && (this.snakeT -= dt) <= 0) {
-      this.snakeT = 2.6 - this.round * .3;
+      this.snakeT = 3.4 - this.round * .3;
       this.add({ type: 'serpent', x0: h.x - 140, x: h.x - 140, t: 0, dur: 2.2, H: 120 + Math.random() * 170, vx: 160 + Math.random() * 120 });
     }
     if ((this.orbT -= dt) <= 0) { this.orbT = 9; this.add({ type: 'orb', x: 140 + Math.random() * (h.x - 360), y: 100 + Math.random() * 160, ph: 0 }); }
@@ -1348,12 +1348,12 @@ class SurasaLevel extends FlightLevel {
       case 'round': {
         const tg = targets[this.round]; this.mouth = lerp(this.mouth, tg, Math.min(1, dt * 2.2));
         this.showHint('grow', 'Hold X to grow and match Surasa\'s mouth', 'Hold GROW to match Surasa\'s mouth');
-        if (Math.abs(this.mouth - tg) < .08 && p.size >= tg - .15 && p.size <= tg + .35) this.match += dt; else this.match = Math.max(0, this.match - dt * .6);
-        if (this.match >= 1.5) {
+        if (Math.abs(this.mouth - tg) < .08 && p.size >= tg - .25 && p.size <= tg + .45) this.match += dt; else this.match = Math.max(0, this.match - dt * .6);
+        if (this.match >= 1) {
           this.addBonus(100); Sound.chord(); this.burst(p.x, p.y, 18, GOLD, 180); this.say('Hanuman matches her!', p.x, p.y - 70 * p.size, GOLD, 24);
           this.round++; this.tw = 0; this.match = 0;
           if (this.round === targets.length) { this.phase = 'wide'; this.speak('Surasa', 'Then I shall open wider still!', 3); this.checkpoint(0, 'Checkpoint'); }
-        } else if (this.tw > 8) { this.lungeK = 0; Sound.drum(.5); this.say('She lunges!', h.x - 120, h.y - 80, '#ffd0d0', 22); }
+        } else if (this.tw > 12) { this.lungeK = 0; Sound.drum(.5); this.say('She lunges!', h.x - 120, h.y - 80, '#ffd0d0', 22); }
         break;
       }
       case 'wide':
@@ -1364,12 +1364,12 @@ class SurasaLevel extends FlightLevel {
         const inZone = p.x > h.x - 70 * h.s && Math.abs(p.y - h.y) < h.open * .4;
         if (!this.closing) {
           this.mouth = lerp(this.mouth, 3.4, Math.min(1, dt * 3));
-          if (inZone && p.size <= .58) { this.inside += dt; if (this.inside > .3) { this.closing = true; this.close = 0; this.say('Quick, back out!', p.x - 60, p.y - 50, '#fff4dc', 24); Sound.whoosh(false); } }
+          if (inZone && p.size <= .65) { this.inside += dt; if (this.inside > .3) { this.closing = true; this.close = 0; this.say('Quick, back out!', p.x - 60, p.y - 50, '#fff4dc', 24); Sound.whoosh(false); } }
           else this.inside = 0;
-          if (p.sx >= this.xRange()[1] - 2 && p.size > .58 && (this.bigT -= dt) <= 0) { this.bigT = 2; this.say('Too big to enter!', p.x, p.y - 50, '#ffd0d0', 20); }
+          if (p.sx >= this.xRange()[1] - 2 && p.size > .65 && (this.bigT -= dt) <= 0) { this.bigT = 2; this.say('Too big to enter!', p.x, p.y - 50, '#ffd0d0', 20); }
           else this.bigT -= dt;
         } else {
-          this.close += dt / 1.9; this.mouth = 3.4 * (1 - this.close) + .3 * this.close;
+          this.close += dt / 2.6; this.mouth = 3.4 * (1 - this.close) + .3 * this.close;
           if (p.x < h.x - 120 * h.s) { // out again: Surasa is pleased
             this.phase = 'bless'; this.blessT = 0; this.addBonus(300); p.inv = 99; Sound.chord(); this.burst(p.x, p.y, 30, GOLD, 220);
             this.speak('Surasa', 'You kept your word and your wits. Go, Hanuman. You will succeed in Rama\'s work.', 4.5);
@@ -1401,8 +1401,8 @@ class SurasaLevel extends FlightLevel {
     const L = View.safe.l + 14, y = View.safe.t + 90, w = 176, x0 = L + 26, f = v => x0 + (clamp(v, .35, 3.4) - .35) / 3.05 * w;
     text(c, 'Size', L - 2, y + 7, { size: 13, lw: 3 });
     rr(c, x0, y, w, 14, 7); c.fillStyle = 'rgba(20,10,40,.6)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
-    if (this.phase === 'round') { const tg = SURASA_T[this.round]; c.fillStyle = 'rgba(42,163,132,.9)'; c.fillRect(f(tg - .15), y + 2, f(tg + .35) - f(tg - .15), 10); if (this.match > 0) { c.fillStyle = GOLD; c.fillRect(f(tg - .15), y + 2, (f(tg + .35) - f(tg - .15)) * this.match / 1.5, 10); } }
-    else { c.fillStyle = 'rgba(255,200,61,.9)'; c.fillRect(f(.35), y + 2, f(.58) - f(.35), 10); }
+    if (this.phase === 'round') { const tg = SURASA_T[this.round]; c.fillStyle = 'rgba(42,163,132,.9)'; c.fillRect(f(tg - .25), y + 2, f(tg + .45) - f(tg - .25), 10); if (this.match > 0) { c.fillStyle = GOLD; c.fillRect(f(tg - .25), y + 2, (f(tg + .45) - f(tg - .25)) * this.match, 10); } }
+    else { c.fillStyle = 'rgba(255,200,61,.9)'; c.fillRect(f(.35), y + 2, f(.65) - f(.35), 10); }
     const mx = f(this.p.size); c.beginPath(); c.moveTo(mx, y + 12); c.lineTo(mx - 7, y + 23); c.lineTo(mx + 7, y + 23); c.closePath(); c.fillStyle = FUR; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
   }
 }
@@ -1500,9 +1500,9 @@ class SimhikaLevel extends FlightLevel {
     const p = this.p;
     this.hidden = this.hiddenNext; this.hiddenNext = false;
     if (this.gripO && p.glow <= 0) {
-      this.grip = Math.min(1, this.grip + dt * 1.1); this.speedMul = 1 - .5 * this.grip; p.vy += 650 * this.grip * dt;
+      this.grip = Math.min(1, this.grip + dt * .7); this.speedMul = 1 - .5 * this.grip; p.vy += 650 * this.grip * dt;
       if (this.grip >= 1) { this.hurt(); this.grip = 0; this.gripO.cool = 2.5; p.vy = -420; }
-    } else this.grip = Math.max(0, this.grip - dt * 1.6);
+    } else this.grip = Math.max(0, this.grip - dt * 2.2);
     this.lastGrip = this.gripO; this.gripO = null;
     if (!this.boss && this.camX >= SIM_LEN) this.startBoss(false);
     if (!this.boss) return;
@@ -1514,16 +1514,16 @@ class SimhikaLevel extends FlightLevel {
       case 'warn': if (s.t > 1.1) { s.ph = 'up'; s.t = 0; Sound.drum(.6); this.showHint('dive', 'She surfaces! Glide down onto her from above', 'She surfaces! Glide down onto her from above'); } break;
       case 'up': {
         s.rise = lerp(s.rise, 1, dt * 5);
-        const hx = s.x, hy = SURF + 46 - 140 * s.rise, d2 = (p.x - hx) ** 2 + (p.y - hy) ** 2, rr2 = (52 + 16 * p.size) ** 2;
+        const hx = s.x, hy = SURF + 46 - 140 * s.rise, d2 = (p.x - hx) ** 2 + (p.y - hy) ** 2, rr2 = (62 + 16 * p.size) ** 2;
         if (s.rise > .6 && d2 < rr2) {
-          if (p.vy > 100 && p.y < hy - 14) {
+          if (p.vy > 30 && p.y < hy - 10) {
             this.hp--; this.addBonus(150); s.flash = .4; s.stun = 1; this.shake = .3; Sound.drum(.9); Sound.chime(true); this.burst(hx, hy - 40, 20, GOLD, 200);
             p.vy = -520; s.ph = 'down'; s.t = 0;
             if (this.hp <= 0) { this.defeated = true; this.defT = 0; Sound.chord(); this.speak('Hanuman', 'Simhika is defeated. The way to Lanka lies open. Jai Shri Ram!', 4); }
             else this.say('Strike!', hx, hy - 90, GOLD, 30);
           } else if (this.hurt()) p.vy = -420;
         }
-        if (s.t > 2.8) { s.ph = 'down'; s.t = 0; }
+        if (s.t > 3.8) { s.ph = 'down'; s.t = 0; }
         break;
       }
       case 'down': s.rise = lerp(s.rise, 0, dt * 4); if (s.t > 1) { s.ph = 'lurk'; s.t = 0; s.stun = 0; } break;
@@ -1828,7 +1828,7 @@ class LankiniLevel extends GroundLevel {
   progress() { return this.won ? 1 : clamp(this.atk / 9, 0, .95); }
   cpFrac() { return 1 / 3; }
   finished() { return this.won && this.wonT > 4.5; }
-  goal2() { return { label: 'Pass the gate within 1:10', ok: this.time <= 70 }; }
+  goal2() { return { label: 'Pass the gate within 1:30', ok: this.time <= 90 }; }
   idle(dt) { if (this.won) { this.wonT += dt; this.kneel = lerp(this.kneel, this.won === 'blow' ? 1 : 0, dt * 2); this.club = lerp(this.club, 1.2, dt * 2); } }
   nextAttack() {
     this.atk++; this.pt = 0;
@@ -1856,20 +1856,20 @@ class LankiniLevel extends GroundLevel {
         if (this.pt > 1.1) { this.ph = ['sweep', 'slam', 'rocks'][this.atk % 3]; this.pt = 0; this.bandY = [F - 40, 330, 205][(Math.random() * 3) | 0]; this.hitDone = false; }
         break;
       case 'sweep':
-        if (this.pt < .9) this.club = lerp(this.club, -2.4, dt * 5);
-        else if (this.pt < 1.25) { this.club = lerp(this.club, Math.PI, dt * 14); if (Math.abs(p.y - this.bandY) < 26 + r && p.x < lx - 30 && this.hurt()) p.vy = this.bandY > 300 ? -420 : 300; }
-        if (this.pt > 1.7) this.nextAttack();
+        if (this.pt < 1.3) this.club = lerp(this.club, -2.4, dt * 5);
+        else if (this.pt < 1.6) { this.club = lerp(this.club, Math.PI, dt * 14); if (Math.abs(p.y - this.bandY) < 26 + r && p.x < lx - 30 && this.hurt()) p.vy = this.bandY > 300 ? -420 : 300; }
+        if (this.pt > 2.1) this.nextAttack();
         break;
       case 'slam':
         if (this.pt < .8) this.club = lerp(this.club, -1.9, dt * 5);
         else this.club = lerp(this.club, 1.35, dt * 16);
-        if (this.pt > .8 && !this.hitDone) { this.hitDone = true; this.waves.push({ x: lx - 120, v: -440 }); this.shake = .25; Sound.drum(.8); }
-        if (this.pt > 1.4 && this.waves.length < 2 && this.hitDone !== 2) { this.hitDone = 2; this.waves.push({ x: lx - 120, v: -440 }); Sound.drum(.6); }
+        if (this.pt > .8 && !this.hitDone) { this.hitDone = true; this.waves.push({ x: lx - 120, v: -330 }); this.shake = .25; Sound.drum(.8); }
+        if (this.pt > 1.4 && this.waves.length < 2 && this.hitDone !== 2) { this.hitDone = 2; this.waves.push({ x: lx - 120, v: -330 }); Sound.drum(.6); }
         if (this.pt > 2.5) this.nextAttack();
         break;
       case 'rocks':
         this.club = lerp(this.club, -.4, dt * 4);
-        for (const tt of [.5, 1.0, 1.5]) if (this.pt - dt < tt && this.pt >= tt) { const T = 1.1, g = 600; this.rocks.push({ x: hand.x, y: hand.y, vx: (p.x - hand.x) / T, vy: (p.y - hand.y) / T - .5 * g * T }); Sound.whoosh(false); }
+        for (const tt of [.6, 1.4]) if (this.pt - dt < tt && this.pt >= tt) { const T = 1.4, g = 600; this.rocks.push({ x: hand.x, y: hand.y, vx: (p.x - hand.x) / T, vy: (p.y - hand.y) / T - .5 * g * T }); Sound.whoosh(false); }
         if (this.pt > 2.7) this.nextAttack();
         break;
       case 'guard': {
@@ -1882,7 +1882,7 @@ class LankiniLevel extends GroundLevel {
             this.speak('Lankini', 'Brahma foretold this: when a vanara strikes me down, Lanka\'s end draws near. Enter, mighty one.', 5);
           } else if (this.pushT <= 0) { this.pushT = 1; this.say('Grow mighty to strike!', p.x, p.y - 50, '#ffd0d0', 20); p.sx -= 50; }
         }
-        if (this.pt > 2.8) { this.ph = 'idle'; this.pt = 0; }
+        if (this.pt > 4.2) { this.ph = 'idle'; this.pt = 0; }
         break;
       }
     }
@@ -1904,7 +1904,7 @@ class LankiniLevel extends GroundLevel {
   drawMid(c) {
     const F = this.floorY, lx = this.lx();
     if (this.ph === 'sweep' && !this.won) {
-      const live = this.pt >= .9 && this.pt < 1.25;
+      const live = this.pt >= 1.3 && this.pt < 1.6;
       c.fillStyle = live ? 'rgba(255,140,60,.55)' : `rgba(255,90,90,${.15 + .15 * Math.sin(this.t * 20)})`;
       c.fillRect(0, this.bandY - 26, lx - 30, 52);
       if (!live) { c.setLineDash([10, 8]); c.lineWidth = 2; c.strokeStyle = 'rgba(255,170,170,.8)'; c.strokeRect(0, this.bandY - 26, lx - 30, 52); c.setLineDash([]); }
@@ -1960,7 +1960,7 @@ class LankaLevel extends GroundLevel {
       else { o.x += o.dir * o.sp * dt; if (o.x > o.x1 || o.x < o.x0) { o.x = clamp(o.x, o.x0, o.x1); o.wait = 1.3; } }
       const ex = o.x + o.dir * 8, ey = o.gy - 82, vx = p.x - ex, vy = p.y - ey, d = Math.hypot(vx, vy);
       const ang = Math.atan2(vy, vx * o.dir) - .12;
-      o.seeing = d < 240 && Math.abs(ang) < .34;
+      o.seeing = d < 200 && Math.abs(ang) < .32;
       if (o.seeing) this.seen.push(o);
       return;
     }
@@ -1976,8 +1976,8 @@ class LankaLevel extends GroundLevel {
     if (p.landed) p.y = p.landed.top - 16 * p.size;
     this.grace = Math.max(0, this.grace - dt);
     const watched = this.grace > 0 || p.glow > 0 ? [] : this.seen;
-    if (watched.length) for (const o of watched) this.susp += dt * (o.type === 'guard' ? [1.6, 3.2, 6] : [1, 2.4, 6])[p.cur];
-    else this.susp = Math.max(0, this.susp - dt * .3);
+    if (watched.length) for (const o of watched) this.susp += dt * (o.type === 'guard' ? [1.25, 2.2, 5] : [.85, 1.6, 5])[p.cur];
+    else this.susp = Math.max(0, this.susp - dt * .6);
     this.lastSeen = this.seen; this.seen = [];
     if (this.susp >= 1) {
       this.susp = 0; this.alarms++; this.everAlarm = true; this.grace = 1.5; Sound.drum(1); Sound.chime(false); this.shake = .3;
@@ -2028,7 +2028,7 @@ class LankaLevel extends GroundLevel {
       c.beginPath(); c.moveTo(lx, o.y + 10); c.lineTo(lx, o.y + 18); c.lineWidth = 2.5; c.strokeStyle = '#d62828'; c.stroke();
     } else if (o.type === 'guard' && layer === 'mid') {
       const ex = x + o.dir * 8, ey = o.gy - 82, a0 = o.dir > 0 ? .12 : Math.PI - .12;
-      c.beginPath(); c.moveTo(ex, ey); c.arc(ex, ey, 240, a0 - .34, a0 + .34); c.closePath();
+      c.beginPath(); c.moveTo(ex, ey); c.arc(ex, ey, 200, a0 - .32, a0 + .32); c.closePath();
       c.fillStyle = o.alert > 0 ? 'rgba(255,90,90,.3)' : o.seeing ? 'rgba(255,200,90,.32)' : 'rgba(255,230,150,.14)'; c.fill();
       drawRakshasa(c, x, o.gy, o.dir, t, { walk: o.wait <= 0 && o.alert <= 0, alert: o.alert > 0, seeing: o.seeing });
     }
@@ -2148,10 +2148,10 @@ class VatikaLevel extends GroundLevel {
     if (this.ph !== 'meet' && (this.spawnT -= dt) <= 0) { this.spawnT = 3; if (this.objs.filter(o => o.type === 'lotus' && !o.dead).length < 3) this.add({ type: 'lotus', x: T.x + (Math.random() - .5) * 2 * T.rx * .8, y: T.y + (Math.random() - .5) * T.ry, ph: Math.random() * 6 }); }
     switch (this.ph) {
       case 'enter': case 'hide':
-        if (this.inTree) { this.ph = 'hide'; this.sleep = Math.min(1, this.sleep + dt / 12); this.aware = Math.max(0, this.aware - dt * .5); this.showHint('wait', 'Stay hidden among the leaves… the guards grow drowsy', 'Stay hidden among the leaves… the guards grow drowsy'); }
+        if (this.inTree) { this.ph = 'hide'; this.sleep = Math.min(1, this.sleep + dt / 9); this.aware = Math.max(0, this.aware - dt * .5); this.showHint('wait', 'Stay hidden among the leaves… the guards grow drowsy', 'Stay hidden among the leaves… the guards grow drowsy'); }
         else {
           if (this.ph === 'hide') this.sleep = Math.max(0, this.sleep - dt / 25);
-          if (p.x > View.w * .4) this.aware += dt * [.25, .55, 1.2][p.cur]; else this.aware = Math.max(0, this.aware - dt * .4);
+          if (p.x > View.w * .4) this.aware += dt * [.15, .4, 1][p.cur]; else this.aware = Math.max(0, this.aware - dt * .4);
           if (this.aware >= 1) { this.aware = 0; this.seen++; Sound.chime(false); this.say('A guard looks up… back to the trees', p.x, p.y - 50, '#ffd0d0', 20); p.sx = 90; p.y = 260; p.vy = 0; }
         }
         if (this.sleep >= 1) { this.ph = 'asleep'; Sound.chord(); this.showHint('descend', 'The guards sleep. Descend quietly to Sita Maa', 'The guards sleep. Descend quietly to Sita Maa'); }
