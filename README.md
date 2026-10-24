@@ -2,6 +2,8 @@
 
 A browser arcade game based on the Sundara Kanda of the Ramayana: Hanuman's journey across the ocean from Mahendra mountain to Lanka, to find Sita Maa in the Ashok Vatika.
 
+**Play it:** https://kmohit31.github.io/hanumanleap/
+
 Everything is in a single `index.html`: canvas art, Web Audio sound, and plain JavaScript, with no image or audio files.
 
 ## Status
