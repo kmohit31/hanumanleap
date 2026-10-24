@@ -309,7 +309,7 @@ const Input = {
   reset() { for (const k in this.held) this.held[k] = 0; this.pressed.clear(); }
 };
 const KEYS = { Space: 'fly', ArrowUp: 'fly', KeyW: 'fly', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-  KeyZ: 'shrink', KeyX: 'grow', ShiftLeft: 'growHold', ShiftRight: 'growHold', KeyC: 'glow', Enter: 'glow' };
+  KeyZ: 'shrink', KeyX: 'grow', ShiftLeft: 'growHold', ShiftRight: 'growHold', KeyC: 'glow', Enter: 'glow', ArrowDown: 'dive', KeyS: 'dive' };
 addEventListener('keydown', e => {
   Sound.init();
   if (e.code === 'Escape' || e.code === 'KeyP') { if (!e.repeat) Game.togglePause(); e.preventDefault(); return; }
@@ -441,11 +441,11 @@ function drawBird(c, x, y, f, s = 1) {
   c.beginPath(); c.moveTo(-15, -12 - w * 1.6); c.lineTo(-10, -8 - w); c.lineWidth = 3; c.strokeStyle = '#55607a'; c.stroke();
   c.restore();
 }
-function drawCloud(c, x, y, s) {
+function drawCloud(c, x, y, s, cols = ['rgba(242,150,175,.55)', 'rgba(255,226,214,.9)']) {
   c.save(); c.translate(x, y); c.scale(s, s);
-  c.fillStyle = 'rgba(242,150,175,.55)';
+  c.fillStyle = cols[0];
   for (const [a, b, r] of [[0, 6, 26], [26, -4, 30], [54, 6, 24], [28, 12, 26]]) { c.beginPath(); c.arc(a, b + 5, r, 0, TAU); c.fill(); }
-  c.fillStyle = 'rgba(255,226,214,.9)';
+  c.fillStyle = cols[1];
   for (const [a, b, r] of [[0, 6, 26], [26, -4, 30], [54, 6, 24], [28, 12, 26]]) { c.beginPath(); c.arc(a, b, r, 0, TAU); c.fill(); }
   c.restore();
 }
@@ -457,13 +457,18 @@ function drawFlame(c, x, y, s, lit) {
   c.restore();
 }
 
-// ---------- Level base: lives, effects, hints, HUD ----------
+// ---------- Level base: lives, effects, hints, speech, HUD, results ----------
 const SIZES = [{ s: .5, th: 1.12, dr: 1, name: 'tiny' }, { s: 1, th: 1, dr: 1, name: 'normal' }, { s: 1.7, th: .8, dr: 1.6, name: 'mighty' }];
+function wrapLines(c, s, maxW) {
+  const out = []; let line = '';
+  for (const w of s.split(' ')) { const t = line ? line + ' ' + w : w; if (line && c.measureText(t).width > maxW) { out.push(line); line = w; } else line = t; }
+  if (line) out.push(line); return out;
+}
 class Level {
   constructor(def) { this.def = def; this.id = def.id; this.name = def.name; this.hintsShown = {}; }
   baseReset() {
-    this.t = 0; this.time = 0; this.score = 0; this.lotus = 0; this.orbs = 0; this.hits = 0; this.lives = 3; this.dev = 0;
-    this.shake = 0; this.fx = []; this.texts = []; this.hint = null; this.endT = 0; this.ended = false; this.got = new Set();
+    this.t = 0; this.time = 0; this.score = 0; this.bonus = 0; this.lotus = 0; this.orbs = 0; this.hits = 0; this.lives = 3; this.dev = 0;
+    this.shake = 0; this.fx = []; this.texts = []; this.hint = null; this.speech = null; this.endT = 0; this.ended = false; this.got = new Set(); this.timeMul = 1;
   }
   hurt() {
     const p = this.p; if (p.inv > 0 || p.glow > 0 || this.state !== 'fly') return false;
@@ -472,7 +477,9 @@ class Level {
     if (this.lives <= 0) { this.state = 'dead'; this.endT = 0; Sound.drum(.9); }
     return true;
   }
+  addBonus(n) { this.bonus += n; this.score += n; }
   say(s, x, y, color = '#fff4dc', size = 22, font = UIF) { this.texts.push({ s, x, y, t: 0, color, size, font }); }
+  speak(who, s, dur = 4) { this.speech = { who, s, t: 0, dur }; }
   showHint(key, kb, touch) {
     if (this.hintsShown[key]) return; this.hintsShown[key] = 1;
     this.hint = { s: Game.touch ? touch : kb, t: 0, dur: 4.2 };
@@ -486,6 +493,7 @@ class Level {
     for (const s of this.texts) s.t += dt;
     this.texts = this.texts.filter(s => s.t < 1.4);
     if (this.hint) { this.hint.t += dt; if (this.hint.t > this.hint.dur) this.hint = null; }
+    if (this.speech) { this.speech.t += dt; if (this.speech.t > this.speech.dur) this.speech = null; }
     this.shake = Math.max(0, this.shake - dt);
   }
   drawFx(c, camX) {
@@ -494,10 +502,19 @@ class Level {
     for (const s of this.texts) { c.globalAlpha = 1 - smooth((s.t - .8) / .6); text(c, s.s, s.x - camX, s.y - s.t * 40, { size: s.size, color: s.color, align: 'center', font: s.font, w: s.font === TF ? 400 : 800 }); }
     c.globalAlpha = 1;
   }
+  goal2() { return { label: 'Gather 70% of the lotus', ok: this.lotus >= this.lotusTotal * .7 }; }
+  result() {
+    const timeBonus = Math.max(0, Math.round((this.par - this.time) * 15)), noHit = this.hits === 0 ? 500 : 0, g2 = this.goal2();
+    const rows = [[this.lotusTotal ? `Lotus flowers ${this.lotus}/${this.lotusTotal}` : `Lotus flowers ${this.lotus}`, this.lotus * 10], [`Jai Shri Ram orbs ${this.orbs}`, this.orbs * 25]];
+    if (this.bonus) rows.push([this.bonusLabel, this.bonus]);
+    rows.push([`Time ${fmtTime(this.time)}`, timeBonus], ['No-hit bonus', noHit]);
+    return { rows, total: this.score + timeBonus + noHit, stars: 1 + (g2.ok ? 1 : 0) + (noHit ? 1 : 0), goals: [[this.def.goal, true], [g2.label, g2.ok], ['No hits', !!noHit]] };
+  }
   drawHud(c, progress, cpFrac) {
     const L = View.safe.l + 14, T = View.safe.t + 12, p = this.p;
     for (let i = 0; i < 3; i++) drawFlame(c, L + 12 + i * 28, T + 18, 1.05, i < this.lives);
     text(c, String(this.score), L + 98, T + 18, { size: 26 });
+    if (this.showClock) text(c, fmtTime(this.time), L + 178, T + 18, { size: 20, color: this.timeMul > 1 && Math.sin(this.t * 12) > -.3 ? '#ff7a7a' : '#fff4dc', lw: 4 });
     // energy
     const bw = 150, y1 = T + 44;
     drawLotus(c, L + 10, y1 + 7, .62);
@@ -528,113 +545,146 @@ class Level {
       text(c, h.s, View.w / 2, hy + 1, { size: 19, w: 700, align: 'center', stroke: false });
       c.globalAlpha = 1;
     }
+    // spoken line (story dialogue)
+    if (this.speech) {
+      const s = this.speech, a = Math.min(1, s.t * 4, (s.dur - s.t) * 2);
+      c.globalAlpha = a; c.font = `600 18px ${UIF}`;
+      const lines = wrapLines(c, s.s, Math.min(620, View.w - 120)), w = Math.max(...lines.map(l => c.measureText(l).width)) + 40, h = 40 + lines.length * 23, sy = T + (this.hint ? 120 : 82);
+      rr(c, View.w / 2 - w / 2, sy, w, h, 14); c.fillStyle = 'rgba(255,244,220,.94)'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+      text(c, s.who, View.w / 2 - w / 2 + 16, sy + 15, { size: 17, font: TF, w: 400, color: '#b8460e', stroke: false });
+      lines.forEach((l, i) => text(c, l, View.w / 2, sy + 38 + i * 23, { size: 18, w: 600, align: 'center', stroke: false, color: INK }));
+      c.globalAlpha = 1;
+    }
   }
 }
 
-// ---------- Level 1: The Great Leap ----------
-const LEAP_LEN = 24000, SURF = 438, HORIZON = 330;
+// ---------- Shared flight engine (levels 1–4) ----------
+const SURF = 438, HORIZON = 330;
 const surfY = (x, t) => SURF + Math.sin(x * .012 + t * 1.6) * 5 + Math.sin(x * .031 - t * 2.3) * 2.5;
-function genLeap() {
-  const R = rng(1008), o = []; let id = 0;
-  const add = e => { e.id = id++; o.push(e); return e; };
-  const lotus = (x, y) => add({ type: 'lotus', x, y, ph: R() * 6 });
-  const orb = (x, y) => add({ type: 'orb', x, y, ph: R() * 6 });
-  const bird = (x, y, vx, amp) => add({ type: 'bird', x, y, by: y, vx, amp, ph: R() * 6, f: R() * 6 });
-  const P = {
-    arc(x) { const n = 5 + (R() * 3 | 0), y0 = 160 + R() * 190, a = 30 + R() * 50, up = R() < .5 ? -1 : 1; for (let i = 0; i < n; i++) lotus(x + i * 70, y0 + up * Math.sin(i / (n - 1) * Math.PI) * a); return n * 70; },
-    orb(x) { const y = 110 + R() * 170; orb(x + 60, y); lotus(x, y + 50); lotus(x + 120, y + 50); return 180; },
-    birds(x) { const n = 3 + (R() * 3 | 0), y0 = 120 + R() * 200; for (let i = 0; i < n; i++) bird(x + i * 90 + R() * 30, clamp(y0 + (R() - .5) * 140, 80, 380), 50 + R() * 70, 12 + R() * 28); return n * 90 + 120; },
-    wave(x) { const H = 140 + R() * 90; add({ type: 'wave', x: x + 160, H, w: 60 + H * .3, h: 0, t: 0, on: false }); lotus(x + 160, SURF - H - 55); lotus(x + 90, SURF - H - 35); lotus(x + 230, SURF - H - 35); return 440; },
-    spray(x) { const n = R() < .5 ? 1 : 2; for (let i = 0; i < n; i++) add({ type: 'spray', x: x + i * 240, H: 170 + R() * 100, h: 0, t: 0, on: false }); for (let i = 0; i < n; i++) lotus(x + i * 240, 120); return n * 240 + 120; },
-    wall(x) { // a wall of hovering seabirds: shrink through the gap, or grow and push past
-      const gc = 180 + R() * 160;
-      for (let y = gc - 27; y >= 46; y -= 30) bird(x, y, 0, 3);
-      for (let y = gc + 27; y <= SURF - 6; y += 30) bird(x, y, 0, 3);
-      add({ type: 'gapmark', x, y: gc });
-      lotus(x - 90, gc); lotus(x + 90, gc); return 260;
-    }
-  };
-  const specials = [[4800, 'wave'], [8400, 'spray'], [10300, 'wall'], [12000, 'cp'], [16200, 'wall'], [19800, 'wall']];
-  let x = 700, si = 0;
-  x += P.arc(x) + 250;
-  while (x < LEAP_LEN - 2700) {
-    if (si < specials.length && x + 500 >= specials[si][0]) {
-      const [sx, k] = specials[si++]; x = Math.max(x, sx);
-      if (k === 'cp') { add({ type: 'cp', x }); x += 350; } else x += P[k](x) + 350;
-      continue;
-    }
-    const d = x / LEAP_LEN;
-    const pool = d < .15 ? ['arc', 'arc', 'orb'] : d < .3 ? ['arc', 'birds', 'arc', 'orb', 'birds'] : d < .5 ? ['arc', 'birds', 'wave', 'spray', 'orb', 'arc'] : ['arc', 'birds', 'wave', 'spray', 'birds', 'orb', 'wave', 'spray', 'arc'];
-    x += P[pool[R() * pool.length | 0]](x) + (430 - 230 * d) + R() * 150;
-  }
-  for (let i = 0; i < 14; i++) lotus(LEAP_LEN - 2300 + i * 140, 250 + Math.sin(i * .7) * 60);
-  orb(LEAP_LEN - 1300, 180);
-  o.sort((a, b) => a.x - b.x); return o;
-}
+const THEMES = {
+  sunset: { sky: ['#2b1b5e', '#7a3b8f', '#ff6f61', '#ffb347'], ox: .72, oy: 300, or: 58, glow: '255,200,90', disc: '#ffe58a', far: ['#4a7fc8', '#174593'], near: ['#1d62b8', '#071d4a'], line: '170,215,255', glit: 'rgba(255,220,120,.7)', cloud: ['rgba(242,150,175,.55)', 'rgba(255,226,214,.9)'] },
+  day: { sky: ['#2a66b8', '#4f97dc', '#9fd0f0', '#ffe9bd'], ox: .82, oy: 120, or: 44, glow: '255,250,210', disc: '#fffbe6', far: ['#4b9ae0', '#1c5aa8'], near: ['#2274c6', '#0a2a66'], line: '205,235,255', glit: 'rgba(255,255,225,.75)', cloud: ['rgba(170,200,235,.6)', 'rgba(255,255,255,.95)'] },
+  teal: { sky: ['#1d3f6e', '#3f86ad', '#f0a870', '#ffd08c'], ox: .32, oy: 296, or: 54, glow: '255,210,140', disc: '#ffe7a8', far: ['#3a92b8', '#135a87'], near: ['#167ab0', '#06284f'], line: '180,232,250', glit: 'rgba(255,232,170,.7)', cloud: ['rgba(240,160,130,.5)', 'rgba(255,232,210,.9)'] },
+  dusk: { sky: ['#0d0a30', '#2a1a5c', '#663073', '#c45f6a'], ox: .16, oy: 110, or: 38, glow: '220,225,255', disc: '#f4f0d4', far: ['#2a3f7a', '#13224f'], near: ['#183a78', '#050f2e'], line: '150,170,230', glit: 'rgba(225,230,255,.6)', cloud: ['rgba(70,50,110,.55)', 'rgba(140,120,185,.7)'], stars: true }
+};
 const CLOUDS = Array.from({ length: 10 }, (_, i) => ({ x: i * 240 + (i * 97 % 130), y: 40 + (i * 53 % 170), s: .55 + (i * 37 % 80) / 100, par: .06 + (i % 3) * .07 }));
+const STARS = Array.from({ length: 70 }, (_, i) => ({ x: (i * 173) % 1500, y: (i * 89) % 300, r: .6 + (i % 3) * .5, ph: i }));
 
-class LeapLevel extends Level {
-  constructor(def) { super(def); this.par = 100; this.reset(); }
+class FlightLevel extends Level {
+  constructor(def) {
+    super(def);
+    Object.assign(this, { len: 20000, par: 100, scroll: true, cont: false, drainHold: 3, drainGlide: .6, lowThrust: .55, lotusEnergy: 8, theme: THEMES.sunset, bonusLabel: 'Birds gently scattered' }, this.config());
+    this.reset();
+  }
+  // ---- hooks for each level ----
+  config() { return {}; }
+  gen() { return []; }
+  startPose(p) { p.y = 230; p.ang = 0; }
+  leapVy() { return -200; }
+  onLeap() {}
+  onReset(cp) {}
+  saveExtra() { return null; }
+  speed(f) { return this.scroll ? 240 + 130 * f : 0; }
+  xRange() { return [140, Math.max(320, View.w * .55)]; }
+  shadowX() { return this.p.x; }
+  levelUpdate(dt) {}
+  idle(dt) {}
+  objUpdate(o, dt, dx, r) {}
+  objDraw(c, o, x, layer) {}
+  drawBack(c, camX) {}
+  drawMid(c, camX) {}
+  drawFront(c, camX) {}
+  drawHudExtra(c) {}
+  finished() { return this.p.x > this.len; }
+  progress() { return clamp(this.p.x / this.len, 0, 1); }
+  cpFrac() { return this.cpX != null ? this.cpX / this.len : null; }
+  // ---- shared ----
   reset(cp) {
     this.baseReset();
-    this.objs = genLeap(); this.lotusTotal = this.objs.filter(o => o.type === 'lotus').length;
-    this.cpX = (this.objs.find(o => o.type === 'cp') || { x: LEAP_LEN / 2 }).x;
-    this.p = { x: 220, y: 293, vy: 0, sx: 220, size: 1, idx: 1, cur: 1, energy: 100, inv: 0, glow: 0, ang: -.55, t: 0 };
-    this.camX = 0; this.state = 'ready'; this.cp = null;
+    this.objs = this.gen(); this.nextId = 100000;
+    this.lotusTotal = this.objs.filter(o => o.type === 'lotus').length;
+    const c1 = this.objs.find(o => o.type === 'cp'); this.cpX = c1 ? c1.x : null;
+    this.p = { x: 220, y: 230, py: 230, vy: 0, sx: 220, size: 1, cs: 1, idx: 1, cur: 1, energy: 100, inv: 0, glow: 0, ang: 0, t: 0, landed: null };
+    this.camX = 0; this.state = 'ready'; this.cp = null; this.speedMul = 1;
+    this.startPose(this.p);
     if (cp) {
-      Object.assign(this, { score: cp.score, lotus: cp.lotus, orbs: cp.orbs, dev: cp.dev, time: cp.time, hits: cp.hits, got: new Set(cp.got) });
-      for (const o of this.objs) if (this.got.has(o.id) || (o.type === 'cp')) o.dead = true;
-      this.camX = cp.camX; this.p.x = cp.camX + this.p.sx; this.p.energy = cp.energy; this.p.y = 220; this.p.ang = 0; this.cp = cp;
+      Object.assign(this, { score: cp.score, lotus: cp.lotus, orbs: cp.orbs, bonus: cp.bonus, dev: cp.dev, time: cp.time, hits: cp.hits, got: new Set(cp.got) });
+      for (const o of this.objs) if (this.got.has(o.id) || (o.type === 'cp' && o.x <= cp.cpx)) o.dead = true;
+      this.camX = cp.camX; this.p.y = 220; this.p.ang = 0; this.p.energy = cp.energy; this.cp = cp;
     }
+    this.p.x = this.camX + this.p.sx;
+    this.onReset(cp);
   }
-  snapshot() { return { camX: this.camX, score: this.score, lotus: this.lotus, orbs: this.orbs, dev: this.dev, time: this.time, hits: this.hits, got: [...this.got], energy: Math.max(this.p.energy, 70) }; }
-  continueFromCheckpoint() { const cp = this.cp; this.reset(cp); this.p.inv = 2; }
+  add(o) { o.id = this.nextId++; this.objs.push(o); return o; }
+  checkpoint(x, label = 'Checkpoint') {
+    this.cp = { camX: this.camX, score: this.score, lotus: this.lotus, orbs: this.orbs, bonus: this.bonus, dev: this.dev, time: this.time, hits: this.hits, got: [...this.got], energy: Math.max(this.p.energy, 70), cpx: x, extra: this.saveExtra() };
+    Sound.chime(true); this.say(label, this.p.x, 190, '#fff4dc', 26);
+  }
+  continueFromCheckpoint() { this.reset(this.cp); this.p.inv = 2; }
   update(dt) {
     const p = this.p; this.t += dt; p.t += dt; this.updateFx(dt);
     if (this.state === 'ready') {
+      this.idle(dt);
       if (Input.take('fly') || Input.held.fly) {
-        this.state = 'fly'; p.vy = this.cp ? -200 : -430; Sound.whoosh(true); Sound.chord();
-        this.showHint('fly', 'Release to glide · ← → to slow down or speed up', 'Release FLY to glide · ◀ ▶ to slow down or speed up');
-        this.say('Jai Shri Ram!', p.x + 40, p.y - 50, GOLD, 30, TF);
+        this.state = 'fly'; p.vy = this.leapVy(); Sound.whoosh(true); Sound.chord();
+        this.say('Jai Shri Ram!', p.x + 40, p.y - 50, GOLD, 30, TF); this.onLeap();
       }
       return;
     }
     if (this.state === 'done' || this.state === 'dead') {
-      this.endT += dt;
-      if (this.state === 'done') { this.camX += 160 * dt; p.sx += 120 * dt; p.y = lerp(p.y, 260, dt * 2); p.ang = lerp(p.ang, -.1, dt * 3); }
+      this.endT += dt; this.idle(dt);
+      if (this.state === 'done') { if (this.scroll) { this.camX += 160 * dt; p.sx += 120 * dt; } p.y = lerp(p.y, 250, dt * 2); p.ang = lerp(p.ang, -.1, dt * 3); }
       else { p.vy = lerp(p.vy, 50, dt * 2); p.y = Math.min(p.y + p.vy * dt, SURF - 20); p.ang = lerp(p.ang, .25, dt * 2); }
       p.x = this.camX + p.sx;
       if (this.endT > 1.8 && !this.ended) { this.ended = true; Game.onLevelEnd(this.state === 'done'); }
       return;
     }
-    this.time += dt;
-    // size: Z / X step through sizes, Shift held = mighty
-    if (Input.take('shrink')) p.idx = Math.max(0, p.idx - 1);
-    if (Input.take('grow')) p.idx = Math.min(2, p.idx + 1);
-    const cur = Input.held.growHold ? 2 : p.idx;
-    if (cur !== p.cur) { Sound.whoosh(cur > p.cur); p.cur = cur; this.burst(p.x, p.y, 8, '#fff3b0', 120); }
-    const S = SIZES[p.cur];
-    p.size = lerp(p.size, S.s, Math.min(1, dt * 12));
+    this.time += dt * this.timeMul; this.timeMul = 1;
+    // size
+    let th, dr;
+    if (this.cont) { // hold to grow / shrink smoothly (Surasa)
+      const g = (Input.held.grow || Input.held.growHold ? 1 : 0) - (Input.held.shrink ? 1 : 0);
+      if (g && g !== this._g) Sound.whoosh(g > 0);
+      this._g = g;
+      p.cs = clamp(p.cs + g * 1.5 * dt, .35, 3.4); p.size = lerp(p.size, p.cs, Math.min(1, dt * 14));
+      p.cur = p.size > 1.4 ? 2 : p.size < .6 ? 0 : 1;
+      th = p.size < 1 ? 1.12 : clamp(1 - (p.size - 1) * .12, .7, 1); dr = 1 + Math.max(0, p.size - 1) * .4;
+    } else { // Z / X step through sizes, Shift held = mighty
+      if (Input.take('shrink')) p.idx = Math.max(0, p.idx - 1);
+      if (Input.take('grow')) p.idx = Math.min(2, p.idx + 1);
+      const cur = Input.held.growHold ? 2 : p.idx;
+      if (cur !== p.cur) { Sound.whoosh(cur > p.cur); p.cur = cur; this.burst(p.x, p.y, 8, '#fff3b0', 120); }
+      const S = SIZES[p.cur]; p.size = lerp(p.size, S.s, Math.min(1, dt * 12)); th = S.th; dr = S.dr;
+    }
     if (Input.take('glow') && this.dev >= 100) { this.dev = 0; p.glow = 3; Sound.chord(); this.say('Golden glow!', p.x, p.y - 50, GOLD, 26); }
     p.inv = Math.max(0, p.inv - dt); p.glow = Math.max(0, p.glow - dt);
     // flight
-    const hold = Input.held.fly;
-    if (hold) { p.vy -= 1750 * S.th * (p.energy > 0 ? 1 : .55) * dt; p.energy -= 3 * S.dr * dt; }
-    else p.energy -= .6 * S.dr * dt;
-    p.energy = Math.max(0, p.energy);
-    if (p.energy < 25) this.showHint('energy', 'Low energy: collect lotus flowers', 'Low energy: collect lotus flowers');
-    p.vy += 800 * dt;
-    if (!hold && p.vy > 210) p.vy -= (p.vy - 210) * Math.min(1, dt * 6);
-    p.vy = clamp(p.vy, -380, 560); p.y += p.vy * dt;
-    const r = 16 * p.size, top = 44 + r;
-    if (p.y < top) { p.y = top; if (p.vy < 0) p.vy = 0; }
-    const maxX = Math.max(320, View.w * .55), mv = (Input.held.right ? 1 : 0) - (Input.held.left ? 1 : 0);
-    p.sx = clamp(p.sx + mv * 280 * dt, 140, maxX);
-    this.camX += (240 + 130 * (p.sx - 140) / (maxX - 140)) * dt; p.x = this.camX + p.sx;
-    p.ang = lerp(p.ang, clamp(p.vy / 900, -.35, .4), Math.min(1, dt * 8));
+    p.py = p.y;
+    const r = 16 * p.size;
+    if (p.landed) {
+      p.vy = 0; p.energy = Math.min(100, p.energy + 35 * dt);
+      if (Input.held.fly) { p.landed = null; p.vy = -330; Sound.whoosh(true); }
+    } else {
+      const hold = Input.held.fly, dive = Input.held.dive && !hold;
+      if (hold) { p.vy -= 1750 * th * (p.energy > 0 ? 1 : this.lowThrust) * dt; p.energy -= this.drainHold * dr * dt; }
+      else p.energy -= this.drainGlide * dr * dt;
+      p.energy = Math.max(0, p.energy);
+      if (p.energy < 25) this.showHint('energy', 'Low energy: collect lotus flowers', 'Low energy: collect lotus flowers');
+      p.vy += (dive ? 1700 : 800) * dt;
+      if (!hold && !dive && p.vy > 210) p.vy -= (p.vy - 210) * Math.min(1, dt * 6);
+      p.vy = clamp(p.vy, -380, 560); p.y += p.vy * dt;
+      const top = 44 + r;
+      if (p.y < top) { p.y = top; if (p.vy < 0) p.vy = 0; }
+    }
+    const [x0, x1] = this.xRange(), mv = p.landed ? 0 : (Input.held.right ? 1 : 0) - (Input.held.left ? 1 : 0);
+    p.sx = clamp(p.sx + mv * 280 * dt, x0, Math.max(x0, x1));
+    if (!p.landed) this.camX += this.speed(x1 > x0 ? (p.sx - x0) / (x1 - x0) : 0) * this.speedMul * dt;
+    this.speedMul = 1;
+    p.x = this.camX + p.sx;
+    p.ang = lerp(p.ang, p.landed ? -.15 : clamp(p.vy / 900, -.35, .4), Math.min(1, dt * 8));
     // the sea
     const sy = surfY(p.x, this.t);
-    if (p.y + r > sy) {
+    if (!p.landed && p.y + r > sy) {
       if (!p.glow) this.hurt();
       p.y = sy - r; p.vy = -480; this.burst(p.x, sy, 16, '#cfefff', 220); Sound.whoosh(true);
     }
@@ -646,7 +696,7 @@ class LeapLevel extends Level {
       switch (o.type) {
         case 'lotus': {
           const y = o.y + Math.sin(this.t * 2 + o.ph) * 5;
-          if (dx * dx + (p.y - y) ** 2 < (r + 18) ** 2) { o.dead = true; this.got.add(o.id); this.lotus++; this.score += 10; p.energy = Math.min(100, p.energy + 8); Sound.chime(false); this.burst(o.x, y, 8, '#ffb3d6', 110); }
+          if (dx * dx + (p.y - y) ** 2 < (r + 18) ** 2) { o.dead = true; this.got.add(o.id); this.lotus++; this.score += 10; p.energy = Math.min(100, p.energy + this.lotusEnergy); Sound.chime(false); this.burst(o.x, y, 8, '#ffb3d6', 110); }
           break;
         }
         case 'orb': {
@@ -663,7 +713,7 @@ class LeapLevel extends Level {
           if (o.sc) { o.x += o.svx * dt; o.y += o.svy * dt; o.svy -= 200 * dt; if (o.y < -60) o.dead = true; break; }
           o.x -= o.vx * dt; o.y = o.by + Math.sin(this.t * 2.4 + o.ph) * o.amp;
           if (dx * dx + (p.y - o.y) ** 2 < (r + 12) ** 2) {
-            if (p.glow > 0 || p.cur === 2) { o.sc = true; o.svx = 150 + Math.random() * 120; o.svy = -120 - Math.random() * 120; this.score += 5; }
+            if (p.glow > 0 || p.cur === 2) { o.sc = true; o.svx = 150 + Math.random() * 120; o.svy = -120 - Math.random() * 120; this.addBonus(5); }
             else if (this.hurt()) { o.sc = true; o.svx = 120; o.svy = -160; }
           }
           break;
@@ -691,46 +741,48 @@ class LeapLevel extends Level {
           break;
         }
         case 'cp':
-          if (dx > 0) { o.dead = true; this.cp = this.snapshot(); this.cp.camX = this.camX; Sound.chime(true); this.say('Checkpoint', o.x, 200, '#fff4dc', 26); }
+          if (dx > 0) { o.dead = true; this.checkpoint(o.x); }
           break;
+        default: this.objUpdate(o, dt, dx, r);
       }
     }
-    if (p.x > LEAP_LEN) { this.state = 'done'; this.endT = 0; p.glow = 0; Sound.chord(); this.say('Mainaka rises to greet you', p.x + 160, 200, GOLD, 26, TF); }
+    this.levelUpdate(dt);
+    if (this.state === 'fly' && this.finished()) { this.state = 'done'; this.endT = 0; p.glow = 0; p.landed = null; Sound.chord(); if (this.def.doneLine) this.say(this.def.doneLine, p.x + (this.scroll ? 160 : 0), 200, GOLD, 26, TF); }
   }
   draw(c) {
-    const p = this.p, t = this.t, W = View.w;
-    let camX = this.camX;
+    const p = this.p, t = this.t, W = View.w, th = this.theme, camX = this.camX;
     const sh = this.shake > 0 ? this.shake * 14 : 0;
     c.save(); if (sh) c.translate((Math.random() - .5) * sh, (Math.random() - .5) * sh);
     // sky
     const sky = c.createLinearGradient(0, 0, 0, HORIZON);
-    sky.addColorStop(0, '#2b1b5e'); sky.addColorStop(.35, '#7a3b8f'); sky.addColorStop(.7, '#ff6f61'); sky.addColorStop(1, '#ffb347');
+    th.sky.forEach((col, i) => sky.addColorStop([0, .35, .7, 1][i], col));
     c.fillStyle = sky; c.fillRect(-20, -20, W + 40, HORIZON + 20);
-    // sun
-    const sx = W * .72, sy = 300;
-    const sg = c.createRadialGradient(sx, sy, 20, sx, sy, 230); sg.addColorStop(0, 'rgba(255,240,170,.9)'); sg.addColorStop(.3, 'rgba(255,200,90,.35)'); sg.addColorStop(1, 'rgba(255,160,80,0)');
+    if (th.stars) for (const s of STARS) { if (s.x > W + 20) continue; c.globalAlpha = .5 + .5 * Math.sin(t * 2 + s.ph); c.fillStyle = '#fff'; c.beginPath(); c.arc(s.x, s.y * .8, s.r, 0, TAU); c.fill(); }
+    c.globalAlpha = 1;
+    // sun / moon
+    const sx = W * th.ox, sy = th.oy;
+    const sg = c.createRadialGradient(sx, sy, 20, sx, sy, 230); sg.addColorStop(0, `rgba(${th.glow},.9)`); sg.addColorStop(.3, `rgba(${th.glow},.3)`); sg.addColorStop(1, `rgba(${th.glow},0)`);
     c.fillStyle = sg; c.fillRect(sx - 230, sy - 230, 460, 460);
-    c.beginPath(); c.arc(sx, sy, 58, 0, TAU); c.fillStyle = '#ffe58a'; c.fill();
-    // clouds
+    c.beginPath(); c.arc(sx, sy, th.or, 0, TAU); c.fillStyle = th.disc; c.fill();
+    if (th.stars) { c.beginPath(); c.arc(sx + 12, sy - 8, th.or * .85, 0, TAU); c.fillStyle = 'rgba(200,200,220,.25)'; c.fill(); }
+    // decorative clouds
     const span = 2400;
-    for (const cl of CLOUDS) { const x = ((cl.x - camX * cl.par) % span + span) % span - 200; drawCloud(c, x, cl.y, cl.s); }
+    for (const cl of CLOUDS) { const x = ((cl.x - camX * cl.par) % span + span) % span - 200; drawCloud(c, x, cl.y, cl.s, th.cloud); }
     // distant ocean
     const oc = c.createLinearGradient(0, HORIZON, 0, SURF);
-    oc.addColorStop(0, '#4a7fc8'); oc.addColorStop(1, '#174593');
+    oc.addColorStop(0, th.far[0]); oc.addColorStop(1, th.far[1]);
     c.fillStyle = oc; c.fillRect(-20, HORIZON, W + 40, SURF - HORIZON + 30);
-    c.fillStyle = 'rgba(255,220,120,.7)';
-    for (let i = 0; i < 11; i++) { const y = HORIZON + 5 + i * 9, w = (34 - i * 2) * (.6 + .4 * Math.sin(t * 3 + i * 1.7)); c.fillRect(sx - w, y, w * 2, 2.5); }
+    if (sy > 200 || th.stars) {
+      c.fillStyle = th.glit;
+      for (let i = 0; i < 11; i++) { const y = HORIZON + 5 + i * 9, w = (34 - i * 2) * (.6 + .4 * Math.sin(t * 3 + i * 1.7)); c.fillRect(sx - w, y, w * 2, 2.5); }
+    }
     for (let k = 0; k < 4; k++) {
       const y = 344 + k * 22, par = .2 + .18 * k, off = -((camX * par) % 46);
-      c.strokeStyle = `rgba(170,215,255,${.22 + .1 * k})`; c.lineWidth = 2; c.beginPath();
+      c.strokeStyle = `rgba(${th.line},${.22 + .1 * k})`; c.lineWidth = 2; c.beginPath();
       for (let x = off - 46; x < W + 46; x += 46) { c.moveTo(x, y); c.quadraticCurveTo(x + 11, y - 3 - k, x + 22, y); }
       c.stroke();
     }
-    // Mahendra mountain (start) and golden Mainaka (end)
-    if (camX < 900) this.drawMahendra(c, -camX);
-    const rise = smooth((camX + W - (LEAP_LEN - 900)) / 1300);
-    if (rise > 0) this.drawMainaka(c, LEAP_LEN + 520 - camX, rise);
-    // objects behind the player
+    this.drawBack(c, camX);
     const L = camX - 300, R = camX + W + 300;
     for (const o of this.objs) {
       if (o.dead || o.x < L - 600 || o.x > R) continue;
@@ -738,17 +790,18 @@ class LeapLevel extends Level {
       if (o.type === 'wave') this.drawWave(c, o, x);
       else if (o.type === 'spray') this.drawSpray(c, o, x);
       else if (o.type === 'cp') this.drawCp(c, x);
+      else this.objDraw(c, o, x, 'back');
     }
     // near sea surface
-    const fw = c.createLinearGradient(0, SURF - 10, 0, VH); fw.addColorStop(0, '#1d62b8'); fw.addColorStop(1, '#071d4a');
+    const fw = c.createLinearGradient(0, SURF - 10, 0, VH); fw.addColorStop(0, th.near[0]); fw.addColorStop(1, th.near[1]);
     c.beginPath(); c.moveTo(-20, VH + 20);
     for (let x = -20; x <= W + 20; x += 12) c.lineTo(x, surfY(x + camX, t));
     c.lineTo(W + 20, VH + 20); c.closePath(); c.fillStyle = fw; c.fill();
     c.beginPath(); for (let x = -20; x <= W + 20; x += 12) { const y = surfY(x + camX, t); x === -20 ? c.moveTo(x, y) : c.lineTo(x, y); }
-    c.lineWidth = 3; c.strokeStyle = 'rgba(160,225,255,.8)'; c.stroke();
-    // player's shadow on the water
-    const shA = clamp(1 - (SURF - p.y) / 380, .1, .5);
-    c.beginPath(); c.ellipse(p.sx, SURF + 8, 30 * p.size, 6 * p.size, 0, 0, TAU); c.fillStyle = `rgba(5,15,40,${shA})`; c.fill();
+    c.lineWidth = 3; c.strokeStyle = `rgba(${th.line},.85)`; c.stroke();
+    this.drawShadow(c, camX);
+    for (const o of this.objs) { if (!o.dead && o.x > L - 600 && o.x < R) this.objDraw(c, o, o.x - camX, 'mid'); }
+    this.drawMid(c, camX);
     // pickups and birds
     for (const o of this.objs) {
       if (o.dead || o.x < L || o.x > R) continue;
@@ -757,43 +810,27 @@ class LeapLevel extends Level {
       else if (o.type === 'orb') drawOrb(c, x, o.y + Math.sin(t * 2 + o.ph) * 6, t);
       else if (o.type === 'bird') drawBird(c, x, o.y, o.f);
     }
-    // Hanuman
-    if (!(p.inv > 0 && Math.sin(t * 30) > .3) || this.state !== 'fly') drawHanuman(c, p.sx, p.y, p.size, p.ang, t, { glow: p.glow > 0 });
+    if (!(p.inv > 0 && p.inv < 50 && Math.sin(t * 30) > .3) || this.state !== 'fly') drawHanuman(c, p.sx, p.y, p.size, p.ang, t, { glow: p.glow > 0 });
+    for (const o of this.objs) { if (!o.dead && o.x > L - 600 && o.x < R) this.objDraw(c, o, o.x - camX, 'front'); }
+    this.drawFront(c, camX);
     this.drawFx(c, camX);
     c.restore();
-    // ready-state title card
     if (this.state === 'ready') {
-      const a = .75 + .25 * Math.sin(t * 4);
+      const a = .75 + .25 * Math.sin(t * 4), cxT = this.titleX ? this.titleX() : W / 2 + 60;
       if (!this.cp) {
-        text(c, this.name, W / 2 + 60, 190, { size: 50, font: TF, w: 400, align: 'center', color: GOLD, lw: 7 });
-        text(c, 'From Mahendra mountain, across the ocean to Lanka', W / 2 + 60, 236, { size: 20, align: 'center', w: 700 });
+        text(c, this.name, cxT, 190, { size: 50, font: TF, w: 400, align: 'center', color: GOLD, lw: 7 });
+        text(c, this.def.sub, cxT, 236, { size: 20, align: 'center', w: 700 });
       }
       c.globalAlpha = a;
-      text(c, Game.touch ? 'Hold FLY to leap' : 'Hold SPACE or click to leap', W / 2 + 60, 290, { size: 26, align: 'center' });
+      text(c, Game.touch ? 'Hold FLY to begin' : 'Hold SPACE or click to begin', cxT, 290, { size: 26, align: 'center' });
       c.globalAlpha = 1;
     }
-    this.drawHud(c, clamp(p.x / LEAP_LEN, 0, 1), this.cpX / LEAP_LEN);
+    this.drawHud(c, this.progress(), this.cpFrac());
+    this.drawHudExtra(c);
   }
-  drawMahendra(c, ox) {
-    const pts = [[-420, 560], [-380, 380], [-250, 262], [-140, 330], [10, 244], [120, 322], [168, 316], [272, 316], [330, 362], [470, 418], [640, 560]];
-    c.save(); c.translate(ox, 0);
-    const g = c.createLinearGradient(0, 240, 0, 540); g.addColorStop(0, '#2f7a5c'); g.addColorStop(1, '#0d2f2c');
-    c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fillStyle = g; c.fill();
-    c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
-    c.beginPath(); for (let i = 2; i < 8; i++) { const [x, y] = pts[i]; i === 2 ? c.moveTo(x, y + 2) : c.lineTo(x, y + 2); } c.lineWidth = 3; c.strokeStyle = 'rgba(255,170,90,.75)'; c.stroke();
-    c.fillStyle = '#1e5a3e';
-    for (const [x, y, r] of [[-300, 320, 16], [-200, 330, 14], [-60, 300, 15], [60, 300, 13], [360, 392, 15], [420, 412, 13], [-330, 420, 18], [-180, 400, 20], [240, 440, 20]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
-    c.restore();
-  }
-  drawMainaka(c, x, rise) {
-    const h = 300 * rise, base = SURF + 10;
-    c.save(); c.translate(x, base);
-    const g = c.createLinearGradient(0, -h, 0, 0); g.addColorStop(0, '#fff0a0'); g.addColorStop(.4, '#ffc83d'); g.addColorStop(1, '#c47a0e');
-    c.beginPath(); c.moveTo(-380, 0); c.lineTo(-240, -h * .55); c.lineTo(-150, -h * .45); c.lineTo(-40, -h); c.lineTo(60, -h * .7); c.lineTo(150, -h * .82); c.lineTo(300, -h * .3); c.lineTo(400, 0); c.closePath();
-    c.fillStyle = g; c.fill(); c.lineWidth = 4; c.strokeStyle = '#7a4a00'; c.stroke();
-    c.globalAlpha = .55 * rise; c.strokeStyle = '#fffbe0'; c.lineWidth = 3;
-    c.beginPath(); c.moveTo(-40, -h); c.lineTo(-90, -h * .55); c.moveTo(150, -h * .82); c.lineTo(110, -h * .45); c.stroke();
-    c.globalAlpha = 1; c.restore();
+  drawShadow(c) {
+    const p = this.p, shA = clamp(1 - (SURF - p.y) / 380, .1, .5);
+    c.beginPath(); c.ellipse(this.shadowX() - this.camX, SURF + 8, 30 * p.size, 6 * p.size, 0, 0, TAU); c.fillStyle = `rgba(5,15,40,${shA})`; c.fill();
   }
   drawWave(c, o, x) {
     if (o.h < 2) return;
@@ -833,13 +870,464 @@ class LeapLevel extends Level {
     drawFlame(c, x, y - 8, 1.5 + Math.sin(t * 9) * .05, true);
   }
 }
+function drawMahendra(c, ox) {
+  const pts = [[-420, 560], [-380, 380], [-250, 262], [-140, 330], [10, 244], [120, 322], [168, 316], [272, 316], [330, 362], [470, 418], [640, 560]];
+  c.save(); c.translate(ox, 0);
+  const g = c.createLinearGradient(0, 240, 0, 540); g.addColorStop(0, '#2f7a5c'); g.addColorStop(1, '#0d2f2c');
+  c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fillStyle = g; c.fill();
+  c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); for (let i = 2; i < 8; i++) { const [x, y] = pts[i]; i === 2 ? c.moveTo(x, y + 2) : c.lineTo(x, y + 2); } c.lineWidth = 3; c.strokeStyle = 'rgba(255,170,90,.75)'; c.stroke();
+  c.fillStyle = '#1e5a3e';
+  for (const [x, y, r] of [[-300, 320, 16], [-200, 330, 14], [-60, 300, 15], [60, 300, 13], [360, 392, 15], [420, 412, 13], [-330, 420, 18], [-180, 400, 20], [240, 440, 20]]) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
+  c.restore();
+}
+function drawMainaka(c, x, rise) {
+  const h = 300 * rise, base = SURF + 10;
+  c.save(); c.translate(x, base);
+  const g = c.createLinearGradient(0, -h, 0, 0); g.addColorStop(0, '#fff0a0'); g.addColorStop(.4, '#ffc83d'); g.addColorStop(1, '#c47a0e');
+  c.beginPath(); c.moveTo(-380, 0); c.lineTo(-240, -h * .55); c.lineTo(-150, -h * .45); c.lineTo(-40, -h); c.lineTo(60, -h * .7); c.lineTo(150, -h * .82); c.lineTo(300, -h * .3); c.lineTo(400, 0); c.closePath();
+  c.fillStyle = g; c.fill(); c.lineWidth = 4; c.strokeStyle = '#7a4a00'; c.stroke();
+  c.globalAlpha = .55 * rise; c.strokeStyle = '#fffbe0'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(-40, -h); c.lineTo(-90, -h * .55); c.moveTo(150, -h * .82); c.lineTo(110, -h * .45); c.stroke();
+  c.globalAlpha = 1; c.restore();
+}
+
+// ---------- Level 1: The Great Leap ----------
+const LEAP_LEN = 24000;
+function genLeap() {
+  const R = rng(1008), o = []; let id = 0;
+  const add = e => { e.id = id++; o.push(e); return e; };
+  const lotus = (x, y) => add({ type: 'lotus', x, y, ph: R() * 6 });
+  const orb = (x, y) => add({ type: 'orb', x, y, ph: R() * 6 });
+  const bird = (x, y, vx, amp) => add({ type: 'bird', x, y, by: y, vx, amp, ph: R() * 6, f: R() * 6 });
+  const P = {
+    arc(x) { const n = 5 + (R() * 3 | 0), y0 = 160 + R() * 190, a = 30 + R() * 50, up = R() < .5 ? -1 : 1; for (let i = 0; i < n; i++) lotus(x + i * 70, y0 + up * Math.sin(i / (n - 1) * Math.PI) * a); return n * 70; },
+    orb(x) { const y = 110 + R() * 170; orb(x + 60, y); lotus(x, y + 50); lotus(x + 120, y + 50); return 180; },
+    birds(x) { const n = 3 + (R() * 3 | 0), y0 = 120 + R() * 200; for (let i = 0; i < n; i++) bird(x + i * 90 + R() * 30, clamp(y0 + (R() - .5) * 140, 80, 380), 50 + R() * 70, 12 + R() * 28); return n * 90 + 120; },
+    wave(x) { const H = 140 + R() * 90; add({ type: 'wave', x: x + 160, H, w: 60 + H * .3, h: 0, t: 0, on: false }); lotus(x + 160, SURF - H - 55); lotus(x + 90, SURF - H - 35); lotus(x + 230, SURF - H - 35); return 440; },
+    spray(x) { const n = R() < .5 ? 1 : 2; for (let i = 0; i < n; i++) add({ type: 'spray', x: x + i * 240, H: 170 + R() * 100, h: 0, t: 0, on: false }); for (let i = 0; i < n; i++) lotus(x + i * 240, 120); return n * 240 + 120; },
+    wall(x) { // a wall of hovering seabirds: shrink through the gap, or grow and push past
+      const gc = 180 + R() * 160;
+      for (let y = gc - 27; y >= 46; y -= 30) bird(x, y, 0, 3);
+      for (let y = gc + 27; y <= SURF - 6; y += 30) bird(x, y, 0, 3);
+      add({ type: 'gapmark', x, y: gc });
+      lotus(x - 90, gc); lotus(x + 90, gc); return 260;
+    }
+  };
+  const specials = [[4800, 'wave'], [8400, 'spray'], [10300, 'wall'], [12000, 'cp'], [16200, 'wall'], [19800, 'wall']];
+  let x = 700, si = 0;
+  x += P.arc(x) + 250;
+  while (x < LEAP_LEN - 2700) {
+    if (si < specials.length && x + 500 >= specials[si][0]) {
+      const [sx, k] = specials[si++]; x = Math.max(x, sx);
+      if (k === 'cp') { add({ type: 'cp', x }); x += 350; } else x += P[k](x) + 350;
+      continue;
+    }
+    const d = x / LEAP_LEN;
+    const pool = d < .15 ? ['arc', 'arc', 'orb'] : d < .3 ? ['arc', 'birds', 'arc', 'orb', 'birds'] : d < .5 ? ['arc', 'birds', 'wave', 'spray', 'orb', 'arc'] : ['arc', 'birds', 'wave', 'spray', 'birds', 'orb', 'wave', 'spray', 'arc'];
+    x += P[pool[R() * pool.length | 0]](x) + (430 - 230 * d) + R() * 150;
+  }
+  for (let i = 0; i < 14; i++) lotus(LEAP_LEN - 2300 + i * 140, 250 + Math.sin(i * .7) * 60);
+  orb(LEAP_LEN - 1300, 180);
+  o.sort((a, b) => a.x - b.x); return o;
+}
+class LeapLevel extends FlightLevel {
+  config() { return { len: LEAP_LEN, par: 100, theme: THEMES.sunset }; }
+  gen() { return genLeap(); }
+  startPose(p) { p.y = 293; p.ang = -.55; }
+  leapVy() { return this.cp ? -200 : -430; }
+  onLeap() { this.showHint('fly', 'Release to glide · ← → to slow down or speed up', 'Release FLY to glide · ◀ ▶ to slow down or speed up'); }
+  drawBack(c, camX) {
+    if (camX < 900) drawMahendra(c, -camX);
+    const rise = smooth((camX + View.w - (LEAP_LEN - 900)) / 1300);
+    if (rise > 0) drawMainaka(c, LEAP_LEN + 520 - camX, rise);
+  }
+}
+
+// ---------- Level 2: Mainaka Mountain ----------
+const MAIN_LEN = 15000;
+function genMainaka() {
+  const R = rng(2024), o = []; let id = 0;
+  const add = e => { e.id = id++; o.push(e); return e; };
+  const lotus = (x, y) => add({ type: 'lotus', x, y, ph: R() * 6 });
+  const orb = (x, y) => add({ type: 'orb', x, y, ph: R() * 6 });
+  const bird = (x, y, vx, amp) => add({ type: 'bird', x, y, by: y, vx, amp, ph: R() * 6, f: R() * 6 });
+  // golden ledges of Mainaka rising from the sea: [x, width, top]
+  const ledges = [[900, 220, 330], [2700, 190, 310], [4500, 170, 295], [6200, 170, 320], [7700, 330, 260, 1], [9500, 170, 300], [11200, 150, 315], [12900, 160, 290]];
+  ledges.forEach(([x, w, top, summit]) => add({ type: 'ledge', x, w, top, summit: !!summit, linger: 0 }));
+  add({ type: 'cp', x: 7700 + 190 });
+  for (let i = 0; i < ledges.length - 1; i++) {
+    const a = ledges[i][0] + 260, b = ledges[i + 1][0] - 260, m = (a + b) / 2;
+    for (let k = 0; k < 3; k++) lotus(a + 140 + k * 70, 190 + Math.sin(k) * 30);
+    if (i >= 1) { const n = 2 + (i > 3 ? 2 : 1); for (let k = 0; k < n; k++) bird(m + k * 110, 120 + R() * 200, 40 + R() * 60, 15 + R() * 20); }
+    if (i >= 3 && i % 2) add({ type: 'wave', x: b - 120, H: 120 + R() * 60, w: 80, h: 0, t: 0, on: false });
+    if (i % 2 === 0) orb(m - 60, 110 + R() * 60);
+  }
+  for (let i = 0; i < 4; i++) lotus(7700 - 120 + i * 80, 260 - 40);
+  o.sort((a, b) => a.x - b.x); return o;
+}
+class MainakaLevel extends FlightLevel {
+  config() { return { len: MAIN_LEN, par: 75, theme: THEMES.day, drainHold: 8, drainGlide: 2.4, lowThrust: .3, lotusEnergy: 4, bonusLabel: 'Swift, gracious departures', showClock: true }; }
+  gen() { return genMainaka(); }
+  onReset() { this.lingered = 0; this.declined = this.declined || false; this.lastLedge = null; }
+  speed(f) { return 230 + 120 * f; }
+  goal2() { return { label: 'Never linger too long', ok: this.lingered < .3 }; }
+  objUpdate(o, dt, dx, r) {
+    if (o.type !== 'ledge') return;
+    const p = this.p, hw = o.w / 2;
+    if (o.x - this.camX < View.w - 100) this.showHint('land', 'Glide onto the golden ledges to rest · don\'t linger', 'Glide onto the golden ledges to rest · don\'t linger');
+    if (o.summit && o.x - this.camX < View.w + 100 && !this.invited) { this.invited = true; this.speak('Mainaka', 'Rest upon my golden peaks, O son of Vayu! The ocean wishes to honour Rama\'s messenger.', 5); }
+    if (p.landed === o) {
+      o.linger += dt;
+      if (o.linger > (o.summit ? 3.5 : 1.6)) {
+        this.timeMul = 3; this.lingered += dt;
+        if (Math.random() < dt * .7) this.say('time slips away…', p.x, p.y - 60, '#ffb3b3', 18);
+        if (!this.declined) { this.declined = true; this.speak('Hanuman', 'Your kindness honours me, but I may not rest until Rama\'s work is done.', 4.5); }
+      }
+      return;
+    }
+    if (!p.landed && p.vy >= 0 && Math.abs(dx) <= hw && p.py + r <= o.top + 4 && p.y + r >= o.top) {
+      p.landed = o; o.linger = 0; p.y = o.top - r; p.vy = 0; this.lastLedge = o;
+      Sound.drum(.25); Sound.chime(false); this.burst(p.x, o.top, 12, GOLD, 120);
+      return;
+    }
+    const k = clamp((p.y + r * .6 - o.top) / (SURF + 40 - o.top), 0, 1);
+    if (Math.abs(dx) < hw + 40 * k + r * .6 && p.y + r > o.top + 10 && p.y < SURF) { this.hurt(); p.vy = -460; }
+  }
+  levelUpdate() {
+    const p = this.p, o = this.lastLedge;
+    if (o && p.landed !== o && o.linger > 0) {
+      if (o.linger <= (o.summit ? 3.5 : 1.6)) { this.addBonus(20); this.say('Swift!', p.x, p.y - 40, GOLD, 22); }
+      if (o.summit) this.speak('Hanuman', 'Forgive me, noble Mainaka. Rama\'s work cannot wait. I bow to you and fly on.', 4.5);
+      o.linger = -1; this.lastLedge = null;
+    }
+  }
+  objDraw(c, o, x, layer) {
+    if (o.type !== 'ledge' || layer !== 'back') return;
+    const hw = o.w / 2, top = o.top;
+    if (o.summit) { const ag = c.createRadialGradient(x, top, 10, x, top, 240); ag.addColorStop(0, 'rgba(255,240,170,.6)'); ag.addColorStop(1, 'rgba(255,240,170,0)'); c.fillStyle = ag; c.fillRect(x - 240, top - 240, 480, 480); }
+    const g = c.createLinearGradient(0, top, 0, SURF + 30); g.addColorStop(0, '#ffe680'); g.addColorStop(.35, '#ffc83d'); g.addColorStop(1, '#b86e0a');
+    c.beginPath(); c.moveTo(x - hw - 44, SURF + 40); c.lineTo(x - hw - 10, top + 16); c.quadraticCurveTo(x - hw, top, x - hw + 12, top); c.lineTo(x + hw - 12, top); c.quadraticCurveTo(x + hw, top, x + hw + 10, top + 16); c.lineTo(x + hw + 44, SURF + 40); c.closePath();
+    c.fillStyle = g; c.fill(); c.lineWidth = 4; c.strokeStyle = '#7a4a00'; c.stroke();
+    c.beginPath(); c.moveTo(x - hw + 12, top + 3); c.lineTo(x + hw - 12, top + 3); c.lineWidth = 3; c.strokeStyle = '#fffbe0'; c.stroke();
+    c.lineWidth = 2; c.strokeStyle = 'rgba(122,74,0,.5)';
+    c.beginPath(); c.moveTo(x - hw * .4, top + 20); c.lineTo(x - hw * .55, top + 70); c.moveTo(x + hw * .3, top + 30); c.lineTo(x + hw * .45, top + 90); c.stroke();
+    for (let i = 0; i < 3; i++) { const sx = x - hw * .6 + i * hw * .6, sy = top + 40 + (i % 2) * 30, a = .5 + .5 * Math.sin(this.t * 4 + i * 2 + o.x); c.fillStyle = `rgba(255,255,230,${a})`; c.beginPath(); c.moveTo(sx, sy - 6); c.lineTo(sx + 2, sy); c.lineTo(sx, sy + 6); c.lineTo(sx - 2, sy); c.closePath(); c.fill(); }
+    if (o.summit) for (const s of [-1, 1]) { blob(c, x + s * (hw - 26), top - 9, 9, '#ff8fc0', 2); drawFlame(c, x + s * (hw - 60), top - 6, 1, true); }
+  }
+  drawBack(c, camX) { // the great golden body of Mainaka on the horizon
+    const rise = smooth((camX + View.w - 4800) / 2500) * (1 - smooth((camX - 11500) / 2500));
+    if (rise > 0) { c.globalAlpha = .45; drawMainaka(c, (7700 - camX) * .35 + View.w * .55, rise * .9); c.globalAlpha = 1; }
+  }
+}
+
+// ---------- Level 3: Surasa, mother of serpents ----------
+function drawSurasa(c, h, t, bow) {
+  const s = h.s, open = h.open, hx = h.x, hy = h.y, W = View.w;
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+  // coiled body rising from the sea
+  c.beginPath(); c.moveTo(hx + 250, SURF + 50); c.bezierCurveTo(hx + 360, SURF - 150, hx + 40, hy + 200, hx + 95 * s, hy + 20);
+  c.lineWidth = 92; c.strokeStyle = INK; c.stroke(); c.lineWidth = 84; c.strokeStyle = '#1f8a6e'; c.stroke();
+  c.setLineDash([8, 16]); c.lineWidth = 64; c.strokeStyle = '#17705a'; c.stroke(); c.setLineDash([]);
+  c.lineWidth = 3; c.strokeStyle = 'rgba(255,215,90,.6)'; c.setLineDash([2, 22]); c.lineWidth = 50; c.stroke(); c.setLineDash([]);
+  // hood behind the head, rimmed in gold
+  c.beginPath(); c.ellipse(hx + 105 * s, hy - 14 * s, 72 * s, 96 * s, -.15, 0, TAU);
+  c.fillStyle = '#2aa384'; c.fill(); c.lineWidth = 6; c.strokeStyle = GOLD; c.stroke(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+  c.fillStyle = '#ffe9a0';
+  for (const [a, b] of [[-.5, -.4], [.5, -.4], [-.55, .2], [.55, .2]]) { c.beginPath(); c.ellipse(hx + 105 * s + a * 70 * s, hy - 14 * s + b * 90 * s, 9 * s, 13 * s, 0, 0, TAU); c.fill(); }
+  // crown
+  c.beginPath(); const cx0 = hx + 95 * s, cy0 = hy - 104 * s;
+  c.moveTo(cx0 - 34 * s, cy0 + 16 * s); c.lineTo(cx0 - 26 * s, cy0 - 6 * s); c.lineTo(cx0 - 12 * s, cy0 + 6 * s); c.lineTo(cx0, cy0 - 18 * s); c.lineTo(cx0 + 12 * s, cy0 + 6 * s); c.lineTo(cx0 + 26 * s, cy0 - 6 * s); c.lineTo(cx0 + 34 * s, cy0 + 16 * s); c.closePath();
+  c.fillStyle = GOLD; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke(); blob(c, cx0, cy0 + 6 * s, 4 * s, '#d62828', 2);
+  // mouth interior (a glowing violet gap, never gory)
+  const tipX = hx - 80 * s, hgX = hx + 62 * s;
+  const mg = c.createRadialGradient(hx, hy, 4, hx, hy, Math.max(30, open)); mg.addColorStop(0, '#9a5ac0'); mg.addColorStop(.6, '#4a1f63'); mg.addColorStop(1, '#1a0b2a');
+  c.beginPath(); c.moveTo(tipX, hy - open / 2); c.lineTo(hgX, hy - 6 * s); c.lineTo(hgX, hy + 6 * s); c.lineTo(tipX + 4, hy + open / 2); c.closePath(); c.fillStyle = mg; c.fill();
+  // lower jaw
+  c.beginPath(); c.moveTo(hgX, hy + 6 * s); c.lineTo(tipX + 4, hy + open / 2); c.quadraticCurveTo(tipX - 8 * s, hy + open / 2 + 10 * s, tipX + 14 * s, hy + open / 2 + 20 * s); c.lineTo(hx + 86 * s, hy + 38 * s); c.closePath();
+  c.fillStyle = '#e9d58e'; c.fill(); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
+  // upper jaw / head
+  c.beginPath(); c.moveTo(hgX, hy - 6 * s); c.lineTo(tipX, hy - open / 2); c.quadraticCurveTo(tipX - 14 * s, hy - open / 2 - 14 * s, tipX + 18 * s, hy - open / 2 - 30 * s); c.quadraticCurveTo(hx + 30 * s, hy - open / 2 - 52 * s, hx + 98 * s, hy - 44 * s); c.closePath();
+  c.fillStyle = '#25a07f'; c.fill(); c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
+  // eye (closed in blessing)
+  const ex = hx + 30 * s, ey = hy - open / 2 * .55 - 28 * s;
+  if (bow > .3) { c.beginPath(); c.arc(ex, ey, 9 * s, .2, Math.PI - .2); c.lineWidth = 3.5; c.strokeStyle = INK; c.stroke(); }
+  else { c.beginPath(); c.ellipse(ex, ey, 11 * s, 8 * s, -.2, 0, TAU); c.fillStyle = '#ffd23f'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke(); c.beginPath(); c.ellipse(ex + 1, ey, 2.4 * s, 6.5 * s, 0, 0, TAU); c.fillStyle = INK; c.fill(); }
+  blob(c, tipX + 16 * s, hy - open / 2 - 18 * s, 2.5 * s, INK, 1);
+  blob(c, hx + 60 * s, hy - open / 2 * .4 - 46 * s, 5 * s, '#d62828', 2);
+  c.restore();
+}
+const SURASA_T = [1.4, 1.9, 2.4, 2.9];
+class SurasaLevel extends FlightLevel {
+  config() { return { scroll: false, cont: true, par: 90, len: 1, theme: THEMES.teal, bonusLabel: 'Trials of Surasa' }; }
+  startPose(p) { p.sx = 200; p.y = 240; }
+  titleX() { return View.w * .36; }
+  onReset(cp) {
+    this.phase = 'intro'; this.round = 0; this.mouth = .6; this.tw = 0; this.match = 0; this.lungeK = -1; this.closing = false; this.close = 0; this.inside = 0;
+    this.bow = 0; this.blessT = 0; this.spawnT = 1; this.snakeT = 3; this.orbT = 6; this.bigT = 0; this.lotusTotal = 0;
+    if (cp && cp.extra) { this.round = cp.extra.round; this.phase = 'wide'; this.tw = 0; this.mouth = 2.7; }
+  }
+  saveExtra() { return { round: this.round }; }
+  head() {
+    const lk = this.lungeK, push = lk < 0 ? 0 : lk < .35 ? 30 * smooth(lk / .35) : -340 * Math.sin(Math.PI * clamp((lk - .35) / .65, 0, 1));
+    return { x: View.w - 250 + push, y: 238 + Math.sin(this.t * 1.3) * 8 + this.bow * 40, open: this.mouth * 55, s: .85 + this.mouth * .12 };
+  }
+  xRange() {
+    const p = this.p, h = this.head();
+    const canEnter = this.phase === 'tiny' && p.size <= .58 && Math.abs(p.y - h.y) < h.open * .38;
+    return [60 + 40 * p.size, canEnter ? h.x + 20 * h.s : h.x - 80 * h.s - 34 * p.size];
+  }
+  progress() { return this.phase === 'bless' ? 1 : clamp((this.round + (this.closing ? .6 : 0)) / (SURASA_T.length + 1), 0, 1); }
+  cpFrac() { return SURASA_T.length / (SURASA_T.length + 1); }
+  finished() { return this.phase === 'bless' && this.blessT > 4.5; }
+  goal2() { return { label: 'Finish within 1:30', ok: this.time <= 90 }; }
+  onLeap() { if (this.phase === 'intro') { this.phase = 'speak'; this.tw = 0; this.speak('Surasa', 'None may cross this ocean without entering my mouth!', 3.5); } }
+  idle(dt) { if (this.phase === 'bless') { this.blessT += dt; this.bow = lerp(this.bow, 1, dt * 2); this.mouth = lerp(this.mouth, .25, dt * 3); } }
+  levelUpdate(dt) {
+    const p = this.p, h = this.head(), targets = SURASA_T;
+    // lotus and orbs drift into the arena
+    if ((this.spawnT -= dt) <= 0) { this.spawnT = 2.4; if (this.objs.filter(o => o.type === 'lotus' && !o.dead).length < 4) this.add({ type: 'lotus', x: 120 + Math.random() * (h.x - 330), y: 110 + Math.random() * 260, ph: Math.random() * 6 }); }
+    if (['round', 'wide', 'tiny'].includes(this.phase) && (this.snakeT -= dt) <= 0) {
+      this.snakeT = 2.6 - this.round * .3;
+      this.add({ type: 'serpent', x0: h.x - 140, x: h.x - 140, t: 0, dur: 2.2, H: 120 + Math.random() * 170, vx: 160 + Math.random() * 120 });
+    }
+    if ((this.orbT -= dt) <= 0) { this.orbT = 9; this.add({ type: 'orb', x: 140 + Math.random() * (h.x - 360), y: 100 + Math.random() * 160, ph: 0 }); }
+    if (this.lungeK >= 0) {
+      this.lungeK += dt / 1.1;
+      if (this.lungeK > .4 && this.lungeK < .85) { const mx = h.x - 20 * h.s; if ((p.x - mx) ** 2 + (p.y - h.y) ** 2 < (h.open * .5 + 30 * h.s + 16 * p.size) ** 2) { if (this.hurt()) p.vy = -300; } }
+      if (this.lungeK >= 1) { this.lungeK = -1; this.tw = 0; this.match = 0; }
+      return;
+    }
+    this.tw += dt;
+    switch (this.phase) {
+      case 'speak': if (this.tw > 2.6) { this.phase = 'round'; this.tw = 0; } break;
+      case 'round': {
+        const tg = targets[this.round]; this.mouth = lerp(this.mouth, tg, Math.min(1, dt * 2.2));
+        this.showHint('grow', 'Hold X to grow and match Surasa\'s mouth', 'Hold GROW to match Surasa\'s mouth');
+        if (Math.abs(this.mouth - tg) < .08 && p.size >= tg - .15 && p.size <= tg + .35) this.match += dt; else this.match = Math.max(0, this.match - dt * .6);
+        if (this.match >= 1.5) {
+          this.addBonus(100); Sound.chord(); this.burst(p.x, p.y, 18, GOLD, 180); this.say('Hanuman matches her!', p.x, p.y - 70 * p.size, GOLD, 24);
+          this.round++; this.tw = 0; this.match = 0;
+          if (this.round === targets.length) { this.phase = 'wide'; this.speak('Surasa', 'Then I shall open wider still!', 3); this.checkpoint(0, 'Checkpoint'); }
+        } else if (this.tw > 8) { this.lungeK = 0; Sound.drum(.5); this.say('She lunges!', h.x - 120, h.y - 80, '#ffd0d0', 22); }
+        break;
+      }
+      case 'wide':
+        this.mouth = lerp(this.mouth, 3.4, Math.min(1, dt * 2));
+        if (this.tw > 1.6) { this.phase = 'tiny'; this.tw = 0; this.showHint('tiny', 'Now hold Z to become tiny · dart into her mouth and back out', 'Now hold SHRINK · dart into her mouth and back out'); }
+        break;
+      case 'tiny': {
+        const inZone = p.x > h.x - 70 * h.s && Math.abs(p.y - h.y) < h.open * .4;
+        if (!this.closing) {
+          this.mouth = lerp(this.mouth, 3.4, Math.min(1, dt * 3));
+          if (inZone && p.size <= .58) { this.inside += dt; if (this.inside > .3) { this.closing = true; this.close = 0; this.say('Quick, back out!', p.x - 60, p.y - 50, '#fff4dc', 24); Sound.whoosh(false); } }
+          else this.inside = 0;
+          if (p.sx >= this.xRange()[1] - 2 && p.size > .58 && (this.bigT -= dt) <= 0) { this.bigT = 2; this.say('Too big to enter!', p.x, p.y - 50, '#ffd0d0', 20); }
+          else this.bigT -= dt;
+        } else {
+          this.close += dt / 1.9; this.mouth = 3.4 * (1 - this.close) + .3 * this.close;
+          if (p.x < h.x - 120 * h.s) { // out again: Surasa is pleased
+            this.phase = 'bless'; this.blessT = 0; this.addBonus(300); p.inv = 99; Sound.chord(); this.burst(p.x, p.y, 30, GOLD, 220);
+            this.speak('Surasa', 'You kept your word and your wits. Go, Hanuman. You will succeed in Rama\'s work.', 4.5);
+          } else if (this.close >= 1) {
+            this.hurt(); p.sx = h.x - 220; p.vy = -300; this.closing = false; this.inside = 0; this.phase = 'wide'; this.tw = 0;
+          }
+        }
+        break;
+      }
+      case 'bless': this.idle(dt); if (Math.random() < dt * 20) this.fx.push({ x: p.x + (Math.random() - .5) * 300, y: 60 + Math.random() * 300, vx: 0, vy: 30, life: 1.2, t: 0, r: 2.5, col: GOLD, g: 0 }); break;
+    }
+  }
+  objUpdate(o, dt, dx, r) {
+    if (o.type !== 'serpent') return;
+    o.t += dt; const k = o.t / o.dur; o.x = o.x0 - o.vx * o.t; o.y = SURF + 10 - 4 * o.H * k * (1 - k);
+    if (k >= 1 || this.phase === 'bless') { o.dead = true; return; }
+    const p = this.p; if ((p.x - o.x) ** 2 + (p.y - o.y) ** 2 < (r + 13) ** 2 && this.hurt()) p.vy = -380;
+  }
+  objDraw(c, o, x, layer) { // a young sea serpent leaping in an arc
+    if (o.type !== 'serpent' || layer !== 'mid') return;
+    const pts = []; for (let i = 0; i < 7; i++) { const tt = Math.max(0, o.t - i * .045), k = tt / o.dur; pts.push([o.x0 - o.vx * tt, SURF + 10 - 4 * o.H * k * (1 - k)]); }
+    c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); pts.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py));
+    c.lineWidth = 15; c.strokeStyle = INK; c.stroke(); c.lineWidth = 10; c.strokeStyle = '#2fb08c'; c.stroke();
+    blob(c, x, o.y, 9, '#25a07f', 2.5); blob(c, x - 4, o.y - 3, 2.2, '#ffd23f', 1);
+  }
+  drawMid(c) { drawSurasa(c, this.head(), this.t, this.bow); }
+  drawHudExtra(c) { // size gauge: Hanuman vs Surasa's mouth
+    if (this.phase !== 'round' && this.phase !== 'tiny' && this.phase !== 'wide') return;
+    const L = View.safe.l + 14, y = View.safe.t + 90, w = 176, x0 = L + 26, f = v => x0 + (clamp(v, .35, 3.4) - .35) / 3.05 * w;
+    text(c, 'Size', L - 2, y + 7, { size: 13, lw: 3 });
+    rr(c, x0, y, w, 14, 7); c.fillStyle = 'rgba(20,10,40,.6)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+    if (this.phase === 'round') { const tg = SURASA_T[this.round]; c.fillStyle = 'rgba(42,163,132,.9)'; c.fillRect(f(tg - .15), y + 2, f(tg + .35) - f(tg - .15), 10); if (this.match > 0) { c.fillStyle = GOLD; c.fillRect(f(tg - .15), y + 2, (f(tg + .35) - f(tg - .15)) * this.match / 1.5, 10); } }
+    else { c.fillStyle = 'rgba(255,200,61,.9)'; c.fillRect(f(.35), y + 2, f(.58) - f(.35), 10); }
+    const mx = f(this.p.size); c.beginPath(); c.moveTo(mx, y + 12); c.lineTo(mx - 7, y + 23); c.lineTo(mx + 7, y + 23); c.closePath(); c.fillStyle = FUR; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+  }
+}
+
+// ---------- Level 4: Simhika, the shadow-catcher ----------
+const SIM_LEN = 15000;
+function genSimhika() {
+  const R = rng(4404), o = []; let id = 0;
+  const add = e => { e.id = id++; o.push(e); return e; };
+  const lotus = (x, y) => add({ type: 'lotus', x, y, ph: R() * 6 });
+  const orb = (x, y) => add({ type: 'orb', x, y, ph: R() * 6 });
+  let x = 1200;
+  for (let i = 0; i < 4; i++) lotus(700 + i * 70, 220);
+  while (x < SIM_LEN - 900) {
+    const d = x / SIM_LEN, k = R();
+    if (k < .45) { add({ type: 'grasp', x: x + 200, w: 46 + R() * 30, vx: (R() - .5) * 90, hunt: d > .35 && R() < .5 ? 60 + d * 60 : 0, ph: R() * 6, cool: 0 }); for (let i = 0; i < 3; i++) lotus(x + 60 + i * 80, 140 + R() * 220); x += 520 - 160 * d; }
+    else if (k < .7) { add({ type: 'hide', x: x + 260, y: 150 + R() * 170, w: 150 + R() * 60, h: 55 }); add({ type: 'grasp', x: x + 260, w: 70, vx: 0, hunt: 0, ph: R() * 6, cool: 0 }); lotus(x + 260, 0 + 150); x += 640; }
+    else if (k < .85) { const H = 130 + R() * 70; add({ type: 'wave', x: x + 160, H, w: 60 + H * .3, h: 0, t: 0, on: false }); lotus(x + 160, SURF - H - 50); x += 480; }
+    else { orb(x + 100, 110 + R() * 160); x += 300; }
+    if (x > SIM_LEN * .5 && !o.some(e => e.type === 'cp')) { add({ type: 'cp', x }); x += 300; }
+  }
+  o.sort((a, b) => a.x - b.x); return o;
+}
+function drawSimhika(c, x, rise, t, flash, s) {
+  const hy = SURF + 46 - 140 * rise;
+  c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+  // hair streaming across the water
+  c.fillStyle = '#16233f'; c.strokeStyle = INK; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(x - 50, hy - 30);
+  for (let i = 0; i <= 8; i++) { const a = Math.PI + i / 8 * Math.PI; c.quadraticCurveTo(x + Math.cos(a - .2) * 90, hy + Math.sin(a - .2) * 90 + Math.sin(t * 3 + i) * 6, x + Math.cos(a) * (70 + (i % 2) * 22), hy + Math.sin(a) * (72 + (i % 2) * 18)); }
+  c.lineTo(x + 130 + Math.sin(t * 2) * 8, SURF + 10); c.lineTo(x - 130 - Math.sin(t * 2) * 8, SURF + 10); c.closePath(); c.fill(); c.stroke();
+  // face
+  c.beginPath(); c.ellipse(x, hy, 46, 54, 0, 0, TAU); c.fillStyle = '#3f8f86'; c.fill(); c.lineWidth = 4; c.stroke();
+  // tiara of sea-gold
+  c.beginPath(); c.moveTo(x - 36, hy - 34); c.lineTo(x - 22, hy - 58); c.lineTo(x - 10, hy - 44); c.lineTo(x, hy - 66); c.lineTo(x + 10, hy - 44); c.lineTo(x + 22, hy - 58); c.lineTo(x + 36, hy - 34); c.closePath(); c.fillStyle = '#d7b33a'; c.fill(); c.lineWidth = 3; c.stroke();
+  blob(c, x, hy - 46, 4, '#3fe0c0', 2);
+  // brows and eyes
+  c.lineWidth = 4; c.beginPath(); c.moveTo(x - 30, hy - 16); c.lineTo(x - 8, hy - 9); c.moveTo(x + 30, hy - 16); c.lineTo(x + 8, hy - 9); c.stroke();
+  for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(x + sx * 18, hy - 2, 10, 6, sx * .2, 0, TAU); c.fillStyle = s === 'stun' ? '#fff4dc' : '#ffd23f'; c.fill(); c.lineWidth = 2.5; c.stroke(); if (s !== 'stun') { c.beginPath(); c.ellipse(x + sx * 18, hy - 2, 2, 5, 0, 0, TAU); c.fillStyle = INK; c.fill(); } }
+  blob(c, x, hy - 22, 3.5, '#d62828', 1.5);
+  c.beginPath(); c.moveTo(x - 4, hy + 4); c.lineTo(x, hy + 14); c.lineTo(x + 4, hy + 14); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(x - 16, hy + 30); c.quadraticCurveTo(x, hy + 24, x + 16, hy + 30); c.stroke();
+  c.fillStyle = '#fff'; c.beginPath(); c.moveTo(x - 12, hy + 28); c.lineTo(x - 9, hy + 35); c.lineTo(x - 6, hy + 27); c.moveTo(x + 12, hy + 28); c.lineTo(x + 9, hy + 35); c.lineTo(x + 6, hy + 27); c.fill();
+  c.lineWidth = 3; c.strokeStyle = GOLD; for (const sx of [-1, 1]) { c.beginPath(); c.arc(x + sx * 47, hy + 14, 7, 0, TAU); c.stroke(); }
+  if (flash > 0) { c.globalAlpha = flash * 2; c.beginPath(); c.ellipse(x, hy, 48, 56, 0, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.globalAlpha = 1; }
+  if (s === 'stun') for (let i = 0; i < 3; i++) { const a = t * 4 + i * TAU / 3; text(c, '✦', x + Math.cos(a) * 40, hy - 74 + Math.sin(a) * 8, { size: 18, color: GOLD, align: 'center', lw: 3 }); }
+  c.restore();
+}
+class SimhikaLevel extends FlightLevel {
+  config() { return { len: SIM_LEN, par: 110, theme: THEMES.dusk, bonusLabel: 'Strikes against Simhika' }; }
+  gen() { return genSimhika(); }
+  onReset(cp) {
+    this.grip = 0; this.gripO = null; this.hidden = false; this.hiddenNext = false; this.boss = false; this.hp = 3; this.defeated = false; this.defT = 0; this.drumT = 0;
+    this.sim = { ph: 'lurk', t: 0, x: 0, rise: 0, flash: 0, stun: 0 };
+    if (cp && cp.extra && cp.extra.boss) this.startBoss(true);
+  }
+  saveExtra() { return { boss: this.boss }; }
+  startBoss(restoring) {
+    this.boss = true; this.camX = SIM_LEN; this.p.x = this.camX + this.p.sx;
+    for (const f of [.3, .75]) this.add({ type: 'grasp', x: SIM_LEN + View.w * f, w: 55, vx: 0, hunt: 70, ph: f * 9, cool: 0 });
+    if (!restoring) { this.checkpoint(SIM_LEN, 'Simhika rises!'); this.speak('Simhika', 'No one passes over my waters. Your shadow is mine!', 3.5); }
+  }
+  speed(f) { return this.boss ? 0 : 230 + 120 * f; }
+  xRange() { return this.boss ? [90, View.w - 90] : [140, Math.max(320, View.w * .55)]; }
+  shadowX() { return this.p.x + (SURF - this.p.y) * .55; }
+  progress() { return this.boss ? 1 : clamp(this.p.x / SIM_LEN, 0, 1); }
+  finished() { return this.defeated && this.defT > 3; }
+  goal2() { return { label: 'Gather 60% of the lotus', ok: this.lotus >= this.lotusTotal * .6 }; }
+  objUpdate(o, dt, dx, r) {
+    const p = this.p;
+    if (o.type === 'hide') { const ex = dx / o.w, ey = (p.y - o.y) / o.h; if (ex * ex + ey * ey < 1) this.hiddenNext = true; return; }
+    if (o.type !== 'grasp') return;
+    o.ph += dt;
+    if (o.x - this.camX < View.w - 60) this.showHint('shadow', 'Simhika grabs shadows! Change height or hide in clouds', 'Simhika grabs shadows! Fly higher or lower, or hide in clouds');
+    if (o.cool > 0) { o.cool -= dt; return; }
+    const sx = this.shadowX();
+    if (o.hunt && Math.abs(sx - o.x) < 420) o.x += Math.sign(sx - o.x) * o.hunt * dt; else o.x += o.vx * dt;
+    if (!this.hidden && this.state === 'fly' && !this.defeated && Math.abs(sx - o.x) < o.w) this.gripO = o;
+  }
+  levelUpdate(dt) {
+    const p = this.p;
+    this.hidden = this.hiddenNext; this.hiddenNext = false;
+    if (this.gripO && p.glow <= 0) {
+      this.grip = Math.min(1, this.grip + dt * 1.1); this.speedMul = 1 - .5 * this.grip; p.vy += 650 * this.grip * dt;
+      if (this.grip >= 1) { this.hurt(); this.grip = 0; this.gripO.cool = 2.5; p.vy = -420; }
+    } else this.grip = Math.max(0, this.grip - dt * 1.6);
+    this.lastGrip = this.gripO; this.gripO = null;
+    if (!this.boss && this.camX >= SIM_LEN) this.startBoss(false);
+    if (!this.boss) return;
+    const s = this.sim; s.t += dt; s.flash = Math.max(0, s.flash - dt);
+    if ((this.drumT -= dt) <= 0 && !this.defeated) { this.drumT = 1.2; Sound.drum(.3); }
+    if (this.defeated) { this.defT += dt; s.rise = lerp(s.rise, 0, dt * 1.5); return; }
+    switch (s.ph) {
+      case 'lurk': s.rise = lerp(s.rise, 0, dt * 4); if (s.t > 1.6) { s.ph = 'warn'; s.t = 0; s.x = this.camX + View.w * (.42 + Math.random() * .4); } break;
+      case 'warn': if (s.t > 1.1) { s.ph = 'up'; s.t = 0; Sound.drum(.6); this.showHint('dive', 'She surfaces! Glide down onto her from above', 'She surfaces! Glide down onto her from above'); } break;
+      case 'up': {
+        s.rise = lerp(s.rise, 1, dt * 5);
+        const hx = s.x, hy = SURF + 46 - 140 * s.rise, d2 = (p.x - hx) ** 2 + (p.y - hy) ** 2, rr2 = (52 + 16 * p.size) ** 2;
+        if (s.rise > .6 && d2 < rr2) {
+          if (p.vy > 100 && p.y < hy - 14) {
+            this.hp--; this.addBonus(150); s.flash = .4; s.stun = 1; this.shake = .3; Sound.drum(.9); Sound.chime(true); this.burst(hx, hy - 40, 20, GOLD, 200);
+            p.vy = -520; s.ph = 'down'; s.t = 0;
+            if (this.hp <= 0) { this.defeated = true; this.defT = 0; Sound.chord(); this.speak('Hanuman', 'Simhika is defeated. The way to Lanka lies open. Jai Shri Ram!', 4); }
+            else this.say('Strike!', hx, hy - 90, GOLD, 30);
+          } else if (this.hurt()) p.vy = -420;
+        }
+        if (s.t > 2.8) { s.ph = 'down'; s.t = 0; }
+        break;
+      }
+      case 'down': s.rise = lerp(s.rise, 0, dt * 4); if (s.t > 1) { s.ph = 'lurk'; s.t = 0; s.stun = 0; } break;
+    }
+  }
+  drawShadow(c, camX) {
+    if (this.hidden) return;
+    const p = this.p, x = this.shadowX() - camX, shA = clamp(.65 - (SURF - p.y) / 900, .3, .6);
+    c.beginPath(); c.ellipse(x, SURF + 8, 30 * p.size, 6 * p.size, 0, 0, TAU); c.fillStyle = `rgba(0,0,10,${shA})`; c.fill();
+    if (this.grip > 0) {
+      c.lineWidth = 3; c.strokeStyle = `rgba(255,110,110,${this.grip})`; c.stroke();
+      c.globalAlpha = this.grip * .6; c.setLineDash([4, 6]); c.strokeStyle = '#5ae0c8'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(x, SURF + 4); c.lineTo(p.sx, p.y + 16 * p.size); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+    }
+  }
+  objDraw(c, o, x, layer) {
+    if (o.type === 'grasp' && layer === 'mid') {
+      const a = o.cool > 0 ? .25 : .8, gripping = this.lastGrip === o && this.grip > 0;
+      c.save(); c.globalAlpha = a;
+      const gg = c.createRadialGradient(x, SURF + 6, 4, x, SURF + 6, o.w + 20); gg.addColorStop(0, 'rgba(90,224,200,.35)'); gg.addColorStop(1, 'rgba(90,224,200,0)');
+      c.fillStyle = gg; c.fillRect(x - o.w - 20, SURF - 30, 2 * o.w + 40, 60);
+      c.beginPath(); c.ellipse(x, SURF + 6, o.w, 11, 0, 0, TAU); c.fillStyle = 'rgba(6,14,26,.85)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = '#5ae0c8'; c.stroke();
+      c.strokeStyle = '#2d8f84'; c.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(x, SURF + 6, o.w * (.35 + i * .25), 4 + i * 2.5, 0, o.ph * (2 + i) % TAU, o.ph * (2 + i) % TAU + 4); c.stroke(); }
+      const reach = gripping ? 28 + 12 * this.grip : 8 + 5 * Math.sin(o.ph * 3);
+      c.fillStyle = '#0f3b3a'; c.strokeStyle = INK; c.lineWidth = 2;
+      for (const k of [-.5, 0, .5]) { const fx = x + k * o.w; c.beginPath(); c.moveTo(fx - 6, SURF + 4); c.quadraticCurveTo(fx - 4, SURF - reach * .6, fx + k * 6, SURF - reach); c.quadraticCurveTo(fx + 4, SURF - reach * .6, fx + 6, SURF + 4); c.closePath(); c.fill(); c.stroke(); }
+      c.restore();
+    } else if (o.type === 'hide' && layer === 'front') {
+      c.save(); c.globalAlpha = .88;
+      for (const [a, b, r] of [[-.6, .2, .45], [-.2, -.3, .55], [.3, -.15, .5], [.65, .25, .4], [0, .35, .5]]) {
+        c.beginPath(); c.arc(x + a * o.w, o.y + b * o.h, r * o.w * .7, 0, TAU); c.fillStyle = '#4a3a7a'; c.fill();
+      }
+      for (const [a, b, r] of [[-.2, -.4, .4], [.3, -.25, .35]]) { c.beginPath(); c.arc(x + a * o.w, o.y + b * o.h, r * o.w * .6, 0, TAU); c.fillStyle = '#7a68b0'; c.fill(); }
+      c.restore();
+    }
+  }
+  drawMid(c, camX) {
+    if (!this.boss) return;
+    const s = this.sim, x = s.x - camX;
+    if (s.ph === 'warn') { c.lineWidth = 3; c.strokeStyle = 'rgba(90,224,200,.8)'; for (let i = 0; i < 3; i++) { const k = ((s.t * 1.5 + i / 3) % 1); c.beginPath(); c.ellipse(x, SURF + 6, 20 + k * 90, 4 + k * 10, 0, 0, TAU); c.stroke(); } }
+    if (s.rise > .02) {
+      drawSimhika(c, x, s.rise, this.t, s.flash, s.stun && s.ph === 'down' ? 'stun' : '');
+      const th = this.theme, fw = c.createLinearGradient(0, SURF - 10, 0, VH); fw.addColorStop(0, th.near[0]); fw.addColorStop(1, th.near[1]);
+      c.beginPath(); c.moveTo(x - 160, VH); for (let px = x - 160; px <= x + 160; px += 10) c.lineTo(px, surfY(px + camX, this.t)); c.lineTo(x + 160, VH); c.closePath(); c.fillStyle = fw; c.fill();
+      c.beginPath(); c.ellipse(x, SURF + 4, 70, 8, 0, 0, TAU); c.strokeStyle = 'rgba(220,240,255,.8)'; c.lineWidth = 3; c.stroke();
+    }
+  }
+  drawHudExtra(c) {
+    if (!this.boss || this.defeated) return;
+    const cxm = View.w / 2 - 20, y = View.safe.t + 46;
+    text(c, 'Simhika', cxm - 50, y, { size: 16, align: 'right', lw: 4, font: TF, w: 400, color: '#5ae0c8' });
+    for (let i = 0; i < 3; i++) blob(c, cxm - 30 + i * 26, y, 8, i < this.hp ? '#3f8f86' : '#2a2050', 2.5);
+  }
+}
 
 // ---------- Levels ----------
 const LEVELS = [
-  { id: 1, name: 'The Great Leap', place: 'Mahendra', from: 'Mahendra', to: 'Mainaka', make: d => new LeapLevel(d) },
-  { id: 2, name: 'Mainaka Mountain', place: 'Mainaka' },
-  { id: 3, name: 'Surasa', place: 'Surasa' },
-  { id: 4, name: 'Simhika', place: 'Simhika' },
+  { id: 1, name: 'The Great Leap', place: 'Mahendra', from: 'Mahendra', to: 'Mainaka', sub: 'From Mahendra mountain, across the ocean to Lanka', goal: 'Cross the sea', doneLine: 'Mainaka rises to greet you', outro: 'Mainaka rises from the sea to offer Hanuman rest.', make: d => new LeapLevel(d) },
+  { id: 2, name: 'Mainaka Mountain', place: 'Mainaka', from: 'Mainaka', to: 'Surasa', sub: 'The golden mountain rises to offer rest', goal: 'Pass Mainaka', doneLine: 'Onward, with Mainaka\'s blessing', outro: 'Hanuman honours Mainaka\'s kindness, and flies on without delay.', make: d => new MainakaLevel(d) },
+  { id: 3, name: 'Surasa', place: 'Surasa', from: 'Trial', to: 'Blessing', sub: 'The mother of serpents tests Hanuman', goal: 'Win Surasa\'s blessing', doneLine: 'Surasa blesses Hanuman', outro: 'Surasa blesses Hanuman and wishes him success in Rama\'s work.', make: d => new SurasaLevel(d) },
+  { id: 4, name: 'Simhika', place: 'Simhika', from: 'Simhika', to: 'Lanka', sub: 'Beware the demoness who seizes shadows', goal: 'Defeat Simhika', doneLine: 'The shores of Lanka glow ahead', outro: 'Simhika is defeated. The golden shores of Lanka glow on the horizon.', make: d => new SimhikaLevel(d) },
   { id: 5, name: 'Lankini at the Gate', place: 'Lanka gate' },
   { id: 6, name: 'Lanka by Night', place: 'Lanka' },
   { id: 7, name: 'Ashok Vatika', place: 'Ashok Vatika' }
@@ -886,19 +1374,18 @@ const Game = {
     this.paused = true; Input.reset();
     UI.card(`<h2>Paused</h2><div class="sub">${this.lv.name}</div>
       <div class="row"><button class="btn" data-a="resume">Resume</button><button class="btn ghost" data-a="restart">Restart level</button><button class="btn ghost" data-a="map">Journey map</button></div>
-      <div class="keys"><kbd>Space</kbd>/<kbd>↑</kbd> fly · <kbd>←</kbd><kbd>→</kbd> slower/faster · <kbd>Z</kbd> shrink · <kbd>X</kbd> or hold <kbd>Shift</kbd> grow · <kbd>C</kbd> golden glow · <kbd>Esc</kbd> pause</div>`,
+      <div class="keys"><kbd>Space</kbd>/<kbd>↑</kbd> fly · <kbd>←</kbd><kbd>→</kbd> slower/faster · <kbd>Z</kbd> shrink · <kbd>X</kbd> or hold <kbd>Shift</kbd> grow · <kbd>↓</kbd> dive · <kbd>C</kbd> golden glow · <kbd>Esc</kbd> pause</div>`,
       { resume: () => this.resume(), restart: () => this.start(this.lv.id), map: () => this.openMap() });
   },
   resume() { this.paused = false; UI.hideCard(); Input.reset(); },
   onLevelEnd(won) {
     const lv = this.lv;
     if (won) {
-      const lotusFrac = lv.lotus / lv.lotusTotal, timeBonus = Math.max(0, Math.round((lv.par - lv.time) * 15)), noHit = lv.hits === 0 ? 500 : 0;
-      const total = lv.score + timeBonus + noHit, stars = 1 + (lotusFrac >= .7 ? 1 : 0) + (lv.hits === 0 ? 1 : 0);
-      const isBest = Save.record(lv.id, total, stars);
+      const r = lv.result();
+      r.lv = lv; r.isBest = Save.record(lv.id, r.total, r.stars);
       this.scene = 'results';
-      if (stars === 3) CG.happytime();
-      CG.midgame(() => this.showResults({ lv, lotusFrac, timeBonus, noHit, total, stars, isBest }));
+      if (r.stars === 3) CG.happytime();
+      CG.midgame(() => this.showResults(r));
     } else {
       this.scene = 'over';
       CG.midgame(() => this.showOver());
@@ -908,17 +1395,13 @@ const Game = {
     const lv = r.lv, best = Save.data.best[lv.id], next = LEVELS[lv.id];
     const st = [1, 2, 3].map(i => `<span class="${i <= r.stars ? 'on' : ''}">★</span>`).join('');
     const ck = ok => ok ? '✓' : '○';
-    UI.card(`<h2>${lv.name}</h2><div class="sub">Mainaka rises from the sea to offer Hanuman rest.</div>
+    UI.card(`<h2>${lv.name}</h2><div class="sub">${lv.def.outro}</div>
       <div class="stars" aria-label="${r.stars} of 3 stars">${st}</div>
       <table class="sum">
-        <tr><td>Lotus flowers ${lv.lotus}/${lv.lotusTotal}</td><td>+${lv.lotus * 10}</td></tr>
-        <tr><td>Jai Shri Ram orbs ${lv.orbs}</td><td>+${lv.orbs * 25}</td></tr>
-        ${lv.score - lv.lotus * 10 - lv.orbs * 25 > 0 ? `<tr><td>Birds gently scattered</td><td>+${lv.score - lv.lotus * 10 - lv.orbs * 25}</td></tr>` : ''}
-        <tr><td>Time ${fmtTime(lv.time)}</td><td>+${r.timeBonus}</td></tr>
-        <tr><td>No-hit bonus</td><td>${r.noHit ? '+500' : '—'}</td></tr>
+        ${r.rows.map(([l, v]) => `<tr><td>${l}</td><td>${v ? '+' + v : '—'}</td></tr>`).join('')}
         <tr class="tot"><td>Total${r.isBest ? ' · new best!' : ''}</td><td>${r.total}</td></tr>
       </table>
-      <div class="goals">${ck(true)} Cross the sea · ${ck(r.lotusFrac >= .7)} Gather 70% of the lotus · ${ck(lv.hits === 0)} No hits${best ? ` · Best ${best.score}` : ''}</div>
+      <div class="goals">${r.goals.map(([l, ok]) => `${ck(ok)} ${l}`).join(' · ')}${best ? ` · Best ${best.score}` : ''}</div>
       <div class="row"><button class="btn" data-a="next">Continue journey</button><button class="btn ghost" data-a="replay">Replay</button><button class="btn ghost" data-a="map">Map</button></div>`,
       { next: () => next && next.make ? this.start(next.id) : (this.openMap(), UI.toast(`${next ? next.name : 'The next trial'} is coming in the next build`)),
         replay: () => this.start(lv.id), map: () => this.openMap() });
